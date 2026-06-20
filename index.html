@@ -1,0 +1,3206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GBK Stadium Overdrive - 3D Runner</title>
+    <!-- Tailwind CSS for modern HUD layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Futuistic Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet" />
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+        background-color: #030712;
+        font-family: 'Space Grotesk', sans-serif;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      .font-orbitron {
+        font-family: 'Orbitron', sans-serif;
+      }
+      /* Custom scanlines & vignette overlays for high-end CRT retro-neon arcade aesthetic */
+      .game-overlay {
+        pointer-events: none;
+        background: radial-gradient(circle, transparent 40%, rgba(3, 7, 18, 0.75) 100%);
+      }
+      .scanlines {
+        background: linear-gradient(
+          to bottom,
+          rgba(255,255,255,0),
+          rgba(255,255,255,0) 50%,
+          rgba(0, 0, 0, 0.25) 50%,
+          rgba(0, 0, 0, 0.25)
+        );
+        background-size: 100% 4px;
+      }
+      /* Custom Animations */
+      @keyframes neon-pulse {
+        0%, 100% { opacity: 0.15; transform: scale(1); }
+        50% { opacity: 0.35; transform: scale(1.05); }
+      }
+      .pulse-overlay {
+        animation: neon-pulse 3s infinite ease-in-out;
+      }
+      /* Hide standard scrollbar */
+      ::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+  </head>
+  <body class="relative w-screen h-screen">
+
+    <!-- GAME CANVAS -->
+    <div id="canvas-container" class="absolute inset-0 w-full h-full z-0"></div>
+
+    <!-- ARCADE STYLE GRIDS & FX -->
+    <div class="absolute inset-0 z-10 game-overlay"></div>
+    <div class="absolute inset-0 z-10 scanlines pointer-events-none opacity-40"></div>
+
+    <!-- STARTING / SPLASH SCREEN OVERLAY -->
+    <div id="start-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 text-white px-6 text-center">
+      <!-- Stadium Ring Pulse Background -->
+      <div class="absolute inset-0 bg-radial-gradient from-blue-900/10 via-transparent to-transparent flex items-center justify-center">
+        <div class="w-96 h-96 rounded-full border border-cyan-500/15 pulse-overlay"></div>
+      </div>
+
+      <div class="relative z-10 max-w-lg mx-auto">
+        <!-- Title Badge -->
+        <span class="inline-block px-3 py-1 mb-4 text-xs font-bold tracking-widest text-[#dda15e] uppercase bg-amber-950/40 border border-amber-600/30 rounded-full font-orbitron">
+          GBK LOOP ATHLETICS
+        </span>
+        
+        <h1 class="text-4xl md:text-6xl font-black tracking-tight uppercase font-orbitron mb-2 bg-gradient-to-r from-amber-400 via-emerald-300 to-cyan-400 bg-clip-text text-transparent">
+          STADIUM JOGGER
+        </h1>
+        <p class="text-xs text-slate-400 uppercase tracking-widest font-orbitron mb-8">
+          Gelora Bung Karno Outer Ring Road
+        </p>
+
+        <!-- Dynamic Game Instructions Card -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 mb-8 text-left backdrop-blur-md">
+          <h3 class="text-sm font-semibold text-amber-400 mb-3 uppercase tracking-wider font-orbitron">
+            Jogger Mechanics
+          </h3>
+          <ul class="text-slate-300 text-sm space-y-2.5">
+            <li class="flex items-start">
+              <span class="text-amber-500 mr-2">✦</span>
+              <span><strong>A/D</strong> or <strong>LEFT/RIGHT Arrows</strong> to steer your lane on the asphalt track.</span>
+            </li>
+            <li class="flex items-start">
+              <span class="text-amber-500 mr-2">✦</span>
+              <span><strong>Hold SHIFT key</strong> (or click the **SPRINT** button) to accelerate into a high-speed sprint!</span>
+            </li>
+            <li class="flex items-start">
+              <span class="text-amber-500 mr-2">✦</span>
+              <span>Watch your **SPRINT ENERGY**! Sprinting drains energy, while slow jogging recharges it.</span>
+            </li>
+            <li class="flex items-start">
+              <span class="text-amber-500 mr-2">✦</span>
+              <span>Dodge local <strong>TRAFFIC CONES AND OTHER JOGGERS</strong> on the track to avoid stumbling.</span>
+            </li>
+
+          </ul>
+        </div>
+
+        <!-- Start Button -->
+        <button id="start-btn" class="w-full md:w-auto px-10 py-4 text-base font-bold font-orbitron tracking-widest text-[#030712] uppercase bg-[#dda15e] hover:bg-amber-400 cursor-pointer active:scale-95 transition-all shadow-[0_0_20px_rgba(218,161,94,0.4)] rounded-xl hover:shadow-[0_0_30px_rgba(218,161,94,0.73)]">
+          BEGIN GBK RUN
+        </button>
+        
+        <p class="text-[11px] text-slate-500 mt-4 tracking-wider">
+          Includes live synthesized energetic tracks and real procedural running footstep SFX!
+        </p>
+      </div>
+    </div>
+
+    <!-- HUD (IN-GAME SCREEN OVERLAY) -->
+    <div id="hud" class="hidden absolute inset-0 z-30 flex flex-col justify-between p-4 md:p-6 text-white pointer-events-none">
+      
+      <!-- TOP STATUS BAR: Laps, Best Times, Core HUD -->
+      <div class="flex items-start justify-between w-full">
+        <!-- Lap Counter Panel -->
+        <div class="flex flex-col bg-slate-950/70 backdrop-blur-md border border-slate-800/80 p-3 rounded-xl pointer-events-auto min-w-[140px]">
+          <span class="text-[10px] text-slate-400 font-orbitron tracking-widest uppercase">LAP POSITION</span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span id="hud-lap" class="text-3xl font-black font-orbitron text-[#dda15e]">1</span>
+            <span class="text-xs text-slate-500">/ 5</span>
+          </div>
+          <span id="lap-status-pulse" class="text-[10px] text-emerald-400 font-orbitron font-bold mt-1 tracking-wider flex items-center gap-1 opacity-0 transition-opacity duration-300">
+            <span class="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span> NEW LAP RECORD
+          </span>
+        </div>
+
+        <!-- Center Stage: Timer & Notification banner -->
+        <div class="flex flex-col items-center">
+          <!-- Lap Live Timer -->
+          <div class="text-center px-4 py-1.5 bg-slate-950/80 backdrop-blur-md border border-slate-800/80 rounded-full">
+            <span id="hud-timer" class="font-orbitron font-semibold text-lg text-slate-100 tracking-wider">00:00.00</span>
+          </div>
+          
+          <!-- Mid-screen flash banner -->
+          <div id="flash-banner" class="mt-4 transform -translate-y-2 flex items-center justify-center pointer-events-none transition-all duration-300 scale-95 opacity-0">
+            <div class="bg-[#dda15e] text-slate-950 text-xs font-extrabold uppercase font-orbitron tracking-widest px-4 py-1.5 rounded border border-amber-300 shadow-[0_0_15px_rgba(218,161,94,0.5)]">
+              LAP COMPLETE!
+            </div>
+          </div>
+        </div>
+
+        <!-- Lap History Panel -->
+        <div class="flex flex-col bg-slate-950/70 backdrop-blur-md border border-slate-800/80 p-3 rounded-xl pointer-events-auto min-w-[160px] text-right">
+          <span class="text-[10px] text-slate-400 font-orbitron tracking-widest uppercase">BEST LAP</span>
+          <div id="hud-best-lap" class="text-lg font-black font-orbitron text-emerald-400 mt-1">--:--.--</div>
+          <span class="block text-[10px] text-slate-500 mt-1 uppercase">Prev Lap: <span id="hud-prev-lap" class="font-mono text-slate-300">--:--</span></span>
+        </div>
+      </div>
+
+      <!-- BOTTOM CONTROL DASHBOARD -->
+      <div class="flex flex-col gap-4 w-full">
+        <!-- Speed Overdrive progress, dynamic alert messages -->
+        <div id="alert-banner" class="self-center bg-red-950/60 border border-red-500/30 text-red-200 text-xs font-semibold px-4 py-1.5 rounded-lg font-orbitron tracking-widest uppercase opacity-0 transition-all duration-500 flex items-center gap-2">
+          <span>⚠️</span> TRAFFIC ALERT: <span id="alert-val">STUMBLE CAUTION</span>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-stretch justify-between gap-4 w-full">
+          <!-- SPEEDOMETER PANEL -->
+          <div class="flex items-center gap-4 bg-slate-950/75 backdrop-blur-md border border-slate-800/80 p-3.5 rounded-xl pointer-events-auto md:w-[340px]">
+            <div class="relative flex items-center justify-center w-14 h-14 rounded-full border-2 border-slate-800 shrink-0">
+              <!-- Radial glowing progress simulation -->
+              <div class="absolute inset-0.5 rounded-full border-2 border-dashed border-amber-500/35 animate-[spin_10s_linear_infinite]"></div>
+              <span class="text-[10px] font-bold text-slate-500 font-orbitron absolute bottom-1">KM/H</span>
+              <span id="hud-speed-num" class="text-xl font-black font-orbitron text-slate-100 z-10">0</span>
+            </div>
+            
+            <div class="flex-1 flex flex-col gap-2">
+              <div>
+                <div class="flex items-center justify-between text-[9px] text-slate-400 font-orbitron tracking-wider mb-0.5">
+                  <span>ATHLETE SPEED</span>
+                  <span id="hud-speed-percent" class="text-cyan-400">0%</span>
+                </div>
+                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                  <div id="hud-speed-bar" class="bg-gradient-to-r from-cyan-500 to-teal-400 h-full w-[0%] transition-all duration-100"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between text-[9px] text-slate-400 font-orbitron tracking-wider mb-0.5">
+                  <span>SPRINT ENERGY</span>
+                  <span id="hud-energy-percent" class="text-amber-400">100%</span>
+                </div>
+                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                  <div id="hud-energy-bar" class="bg-gradient-to-r from-amber-500 to-yellow-400 h-full w-[100%] transition-all duration-100"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AUDIO & STATS FLIGHT TOGGLE -->
+          <div class="flex items-center justify-center gap-2 bg-slate-950/75 backdrop-blur-md border border-slate-800/80 px-4 py-2 rounded-xl pointer-events-auto self-center md:self-auto select-none">
+            <button id="sprint-btn" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold hover:bg-amber-950/40 border border-amber-800 hover:border-amber-700 active:scale-95 transition-all text-amber-400 rounded-lg cursor-pointer">
+              <span>⚡</span> <span class="font-orbitron text-[9px] tracking-wider uppercase">HOLD SPRINT (SHIFT)</span>
+            </button>
+            <div class="h-6 w-[1px] bg-slate-800"></div>
+            <button id="mute-btn" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold hover:bg-slate-900 border border-slate-800 hover:border-slate-700 active:scale-95 transition-all text-cyan-400 rounded-lg cursor-pointer">
+              <span id="mute-icon">🔇</span> <span id="mute-label" class="font-orbitron text-[9px] tracking-wider uppercase font-bold">SOUND OFF</span>
+            </button>
+            <div class="flex items-center gap-1.5 px-2 py-1.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
+              <span class="text-[9px] font-mono text-slate-400 uppercase">VOL</span>
+              <input id="volume-slider" type="range" min="0" max="1" step="0.05" value="0.35" class="w-12 md:w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400" />
+            </div>
+            <div class="h-6 w-[1px] bg-slate-800"></div>
+            <div class="text-left text-[10px] font-mono text-slate-400">
+              Score: <span id="hud-score" class="text-emerald-400 font-bold">0</span>
+            </div>
+          </div>
+
+          <!-- SHIELD HEALTH PANEL -->
+          <div class="flex items-center gap-4 bg-slate-950/75 backdrop-blur-md border border-slate-800/80 p-3.5 rounded-xl pointer-events-auto md:w-72">
+            <div class="flex-1 text-right">
+              <div class="flex items-center justify-between text-[10px] text-slate-400 font-orbitron tracking-wider mb-1">
+                <span>HEALTH</span>
+                <span id="hud-shield-percent" class="text-emerald-400 font-bold">100%</span>
+              </div>
+              <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                <div id="hud-shield-bar" class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-full w-[100%] transition-all duration-100"></div>
+              </div>
+            </div>
+
+            <div class="relative flex items-center justify-center w-14 h-14 rounded-full border-2 border-slate-800 bg-emerald-950/10">
+              <span id="hud-shield-warning" class="absolute inset-0 bg-red-500/20 rounded-full animate-ping opacity-0"></span>
+              <span class="text-emerald-400 text-lg">❤️</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOUCH CONTROLS HELPER OVERLAYS FOR MOBILE (VISIBLE ONLY ON TOUCH INSTRUCTIONS) -->
+    <div id="mobile-controls-gui" class="hidden absolute inset-x-0 bottom-36 z-20 flex justify-between px-6 pointer-events-none md:hidden">
+      <div class="flex flex-col items-center opacity-40">
+        <div class="w-12 h-12 rounded-lg border border-dashed border-cyan-400/50 flex items-center justify-center">
+          <span class="text-xs font-black font-orbitron text-cyan-400">&larr;</span>
+        </div>
+        <span class="text-[9px] text-slate-500 font-orbitron font-bold mt-1 uppercase">Touch Left</span>
+      </div>
+      <div class="flex flex-col items-center opacity-40">
+        <div class="w-12 h-12 rounded-lg border border-dashed border-cyan-400/50 flex items-center justify-center">
+          <span class="text-xs font-black font-orbitron text-cyan-400">&rarr;</span>
+        </div>
+        <span class="text-[9px] text-slate-500 font-orbitron font-bold mt-1 uppercase">Touch Right</span>
+      </div>
+    </div>
+
+    <!-- GAME OVER SCREEN OVERLAY -->
+    <div id="game-over-screen" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 text-white px-6 text-center">
+      <!-- Defeat grid pulse -->
+      <div class="absolute inset-0 bg-radial-gradient from-red-950/10 via-transparent to-transparent flex items-center justify-center">
+        <div class="w-[450px] h-[450px] rounded-full border border-red-500/10 pulse-overlay"></div>
+      </div>
+
+      <div class="relative z-10 max-w-md mx-auto">
+        <div id="go-icon-container" class="w-16 h-16 bg-red-950/50 border border-red-500/40 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500 text-3xl">
+          <span id="go-icon">👟</span>
+        </div>
+        
+        <h2 id="go-title" class="text-3xl md:text-4xl font-extrabold tracking-wider uppercase font-orbitron text-[#dda15e] mb-1">
+          FATIGUE LIMIT REACHED
+        </h2>
+        <p id="go-subtitle" class="text-xs text-slate-400 uppercase tracking-widest font-orbitron mb-8">
+          STADIUM JOG COMPLETED
+        </p>
+
+        <!-- Stats readout card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-8 text-left">
+          <h3 class="text-xs font-semibold text-amber-400 mb-4 uppercase tracking-wider font-orbitron border-b border-slate-800 pb-2">
+            ATHLETIC REPORT
+          </h3>
+          <div class="space-y-3 font-orbitron text-sm">
+            <div class="flex justify-between">
+              <span class="text-slate-400">RUNNING SCORE:</span>
+              <span id="go-score" class="text-emerald-400 font-bold">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">PEAK RUNNING PACE:</span>
+              <span id="go-speed" class="text-cyan-400 font-bold">0 KM/H</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">LAPS RUN:</span>
+              <span id="go-laps" class="text-teal-400 font-bold">0</span>
+            </div>
+            <div id="go-new-best" class="hidden bg-emerald-950/30 border border-emerald-500/30 text-emerald-400 text-[10px] text-center uppercase py-1 rounded w-full tracking-wider mt-2">
+              🏆 NEW RUN PERSONAL BEST REGISTERED!
+            </div>
+          </div>
+        </div>
+
+        <!-- Retry Button -->
+        <button id="retry-btn" class="w-full px-8 py-4 text-base font-bold font-orbitron tracking-widest text-[#030712] uppercase bg-[#dda15e] hover:bg-amber-400 cursor-pointer active:scale-95 transition-all shadow-[0_0_20px_rgba(218,161,94,0.4)] rounded-xl">
+          RESTART JOG
+        </button>
+      </div>
+    </div>
+
+
+    <!-- COMPLETE GAME ENGINE JAVASCRIPT -->
+    <script>
+      // Global configuration variables & state pointers
+      let scene, camera, renderer, clock;
+      let player, playerGroup;
+      let trackRadius = 150;
+      let trackWidth = 40; 
+      
+      // Speed, health, lap state controls
+      let speed = 0;
+      let maxSpeed = 0.35; // Cap speed values organically
+      let baseAcceleration = 0.0035;
+      let decelMultiplier = 0.985;
+      let playerAngle = 0;
+      let playerRadius = 150;
+      let currentLean = 0;
+      let targetShield = 100;
+      let curShield = 100;
+      let score = 0;
+      let peakSpeed = 0;
+      let boosterTime = 0;
+      let currentLap = 1;
+      let scoreIncrementCounter = 0;
+
+      // Athlete Energy & Sprinting
+      let sprintEnergy = 100;
+      const maxEnergy = 100;
+      let isSprinting = false;
+      let isExhausted = false;
+
+      // Stride tracking for footstep triggers
+      let lastFootstepCheck = 0;
+
+      // Key matrices
+      let keys = { left: false, right: false, forward: false, backward: false, boost: false };
+      let mobileSteer = 0; // -1 for left, 1 for right, 0 for stationary
+
+      // Timing tracking
+      let lapTime = 0;
+      let bestLapTime = null;
+      let gameActive = false;
+      let gameTimer = 0;
+
+      // Environment element objects
+      let aiRunners = [];
+      let playerSkinMat, playerJerseyMat, playerShortsMat;
+      let hitFlashTime = 0;
+      let speedPads = [];
+      let stadiumCore;
+      let cloudGroup;
+      let searchlights = [];
+      let dustParticles;
+      let boosterVFXParticles = [];
+      let particleGroup;
+
+      // Audio engine structure
+      let audioCtx = null;
+      let mainAudioMuted = true;
+
+      // Live synthesized progressive electronic music channels
+      let musicInterval = null;
+      let musicStep = 0;
+
+      // DOM element connections
+      const startScreen = document.getElementById('start-screen');
+      const startBtn = document.getElementById('start-btn');
+      const hud = document.getElementById('hud');
+      const hudLap = document.getElementById('hud-lap');
+      const hudTimer = document.getElementById('hud-timer');
+      const hudBestLap = document.getElementById('hud-best-lap');
+      const hudPrevLap = document.getElementById('hud-prev-lap');
+      const hudSpeedNum = document.getElementById('hud-speed-num');
+      const hudSpeedPercent = document.getElementById('hud-speed-percent');
+      const hudSpeedBar = document.getElementById('hud-speed-bar');
+      const hudEnergyBar = document.getElementById('hud-energy-bar');
+      const hudEnergyPercent = document.getElementById('hud-energy-percent');
+      const hudShieldBar = document.getElementById('hud-shield-bar');
+      const hudShieldPercent = document.getElementById('hud-shield-percent');
+      const hudShieldWarning = document.getElementById('hud-shield-warning');
+      const hudScore = document.getElementById('hud-score');
+      const muteBtn = document.getElementById('mute-btn');
+      const muteIcon = document.getElementById('mute-icon');
+      const muteLabel = document.getElementById('mute-label');
+      const alertBanner = document.getElementById('alert-banner');
+      const alertVal = document.getElementById('alert-val');
+      const gameOverScreen = document.getElementById('game-over-screen');
+      const goScore = document.querySelectorAll('#go-score');
+      const goSpeed = document.querySelectorAll('#go-speed');
+      const goLaps = document.querySelectorAll('#go-laps');
+      const goNewBest = document.getElementById('go-new-best');
+      const retryBtn = document.getElementById('retry-btn');
+      const flashBanner = document.getElementById('flash-banner');
+      const lapStatusPulse = document.getElementById('lap-status-pulse');
+      const canvasContainer = document.getElementById('canvas-container');
+
+      // AUDIO INITIALIZATION SYSTEM
+      let masterGainNode = null;
+      let masterVolume = 0.35; // Default lower volume as per request for maximum background music comfort!
+
+      function initAudio() {
+        if (audioCtx) return;
+        try {
+          // Setup audio context supporting cross-browsers
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          masterGainNode = audioCtx.createGain();
+          masterGainNode.gain.setValueAtTime(masterVolume, audioCtx.currentTime);
+          masterGainNode.connect(audioCtx.destination);
+        } catch(e) {
+          console.warn("Web Audio Core initialization skipped or failed: ", e);
+        }
+      }
+
+      function updateAudioEngine(currentSpeedNorm) {
+        // Obsolete hover engine hum updating. We now trigger footstep sound loops inside the animation gait!
+      }
+
+      // Procedural Footstep sound generator on Asphalt - low thud effect with zero hiss/tapping noise
+      function playProceduralFootstep(currentSpeed, isOpponent = false, volScale = 1.0) {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          let duration = isOpponent ? 0.05 : 0.065;
+          let osc = audioCtx.createOscillator();
+          let filter = audioCtx.createBiquadFilter();
+          let gain = audioCtx.createGain();
+          
+          osc.type = 'triangle';
+          // Deep organic body frequency - no metallic clicky tap noise!
+          osc.frequency.setValueAtTime(isOpponent ? 72 : 88, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(32, audioCtx.currentTime + duration);
+          
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(isOpponent ? 85 : 100, audioCtx.currentTime);
+          
+          // Low, soft volume thud so it is realistic and non-intrusive!
+          let ampVal = isOpponent ? 0.045 : 0.082;
+          // Scale it dynamically based on the current speed
+          ampVal *= (0.35 + (currentSpeed / 0.16) * 0.65);
+          // Scale relative to spatial observer proximity
+          ampVal *= volScale;
+          
+          gain.gain.setValueAtTime(ampVal, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+          
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(masterGainNode || audioCtx.destination);
+          
+          osc.start(0);
+          osc.stop(audioCtx.currentTime + duration);
+        } catch(e) {}
+      }
+
+      // ENTERTAINING SPECTACULAR PROCEDURAL AUDIO ENGINE - DARUDE SANDSTORM EDITION
+      let windNoiseNode = null;
+      let windGainNode = null;
+
+      function playSynthesizedKick() {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          let osc = audioCtx.createOscillator();
+          let gain = audioCtx.createGain();
+          osc.type = 'sine';
+          
+          osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(45, audioCtx.currentTime + 0.10);
+          
+          gain.gain.setValueAtTime(0.42, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+          
+          osc.connect(gain);
+          gain.connect(masterGainNode || audioCtx.destination);
+          
+          osc.start(0);
+          osc.stop(audioCtx.currentTime + 0.12);
+        } catch(e) {}
+      }
+
+      function playSynthesizedHihat() {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          let bufferSize = audioCtx.sampleRate * 0.022; // extremely short to prevent background noise or hiss
+          let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          let data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+          let source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          
+          let filter = audioCtx.createBiquadFilter();
+          filter.type = 'highpass';
+          filter.frequency.setValueAtTime(10500, audioCtx.currentTime);
+          
+          let gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0.035, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.018);
+          
+          source.connect(filter);
+          filter.connect(gain);
+          gain.connect(masterGainNode || audioCtx.destination);
+          
+          source.start(0);
+        } catch(e) {}
+      }
+
+      function playSynthesizedSnare() {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          let bufferSize = audioCtx.sampleRate * 0.075;
+          let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          let data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+          
+          let noise = audioCtx.createBufferSource();
+          noise.buffer = buffer;
+
+          let noiseFilter = audioCtx.createBiquadFilter();
+          noiseFilter.type = 'bandpass';
+          noiseFilter.frequency.setValueAtTime(1050, audioCtx.currentTime);
+
+          let noiseGain = audioCtx.createGain();
+          noiseGain.gain.setValueAtTime(0.075, audioCtx.currentTime);
+          noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.055);
+
+          let osc = audioCtx.createOscillator();
+          let oscGain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+          
+          oscGain.gain.setValueAtTime(0.10, audioCtx.currentTime);
+          oscGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+
+          noise.connect(noiseFilter);
+          noiseFilter.connect(noiseGain);
+          noiseGain.connect(masterGainNode || audioCtx.destination);
+
+          osc.connect(oscGain);
+          oscGain.connect(masterGainNode || audioCtx.destination);
+
+          noise.start(0);
+          osc.start(0);
+          osc.stop(audioCtx.currentTime + 0.05);
+        } catch(e) {}
+      }
+
+      // A warm, extremely smooth synthesizer bass beat
+      function playRunningBass(freq, duration = 0.22, gainVal = 0.18) {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          let osc = audioCtx.createOscillator();
+          let filter = audioCtx.createBiquadFilter();
+          let gain = audioCtx.createGain();
+          
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(140, audioCtx.currentTime);
+          
+          // Smooth rise to prevent popping/clicking noise
+          gain.gain.setValueAtTime(0, audioCtx.currentTime);
+          gain.gain.linearRampToValueAtTime(gainVal, audioCtx.currentTime + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+          
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(masterGainNode || audioCtx.destination);
+          
+          osc.start(0);
+          osc.stop(audioCtx.currentTime + duration + 0.05);
+        } catch(e) {}
+      }
+
+      // A gorgeous, clean, shimmering pluck/pad lead synthesizer - Zero background noise/hiss
+      function playRunningLead(freq, duration = 0.18, gainVal = 0.05) {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          let osc = audioCtx.createOscillator();
+          let gain = audioCtx.createGain();
+          let filter = audioCtx.createBiquadFilter();
+          
+          osc.type = 'sine'; // Super-clean sine wave with zero hiss!
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(1800, audioCtx.currentTime);
+          
+          // Smooth rise envelope to remove ANY clicky "tap tap tap" artifacts!
+          gain.gain.setValueAtTime(0, audioCtx.currentTime);
+          gain.gain.linearRampToValueAtTime(gainVal, audioCtx.currentTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+          
+          // Connect sweet stereo feedback delay
+          let delay = audioCtx.createDelay(0.5);
+          delay.delayTime.setValueAtTime(0.18, audioCtx.currentTime);
+          let delayGain = audioCtx.createGain();
+          delayGain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+          
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(masterGainNode || audioCtx.destination);
+          
+          filter.connect(delay);
+          delay.connect(delayGain);
+          delayGain.connect(masterGainNode || audioCtx.destination);
+          
+          osc.start(0);
+          osc.stop(audioCtx.currentTime + duration + 0.1);
+        } catch(e) {}
+      }
+
+      function startAwesomeMusic() {
+        if (!audioCtx || musicInterval) return;
+        musicStep = 0;
+        
+        // Fast-paced epic 120 BPM upbeat groove (Uplifting Running Groove)
+        let stepDuration = 60 / 120 / 2; // eighth notes of high-energy beats
+        musicInterval = setInterval(() => {
+          if (!gameActive || mainAudioMuted) return;
+          try {
+            const currentBar = Math.floor(musicStep / 8) % 4;
+
+            // --- CONSTANT UPBEAT SLOW RUN MUSIC (Joyful Morning Jogger Groove at steady 120 BPM tempo!) ---
+            
+            // Soft cheerful 4-on-the-floor physical kick drum pulse
+            if (musicStep % 2 === 0) {
+              playSynthesizedKick();
+            }
+
+            // Bright happy synthesized hi-hat ticks on the offbeats
+            if (musicStep % 4 === 2) {
+              playSynthesizedHihat();
+            }
+
+            // Bouncy upbeat syncopated bass groove (warm walker)
+            if (musicStep % 2 === 1) {
+              const bassFreqs = [110.00, 130.81, 98.00, 87.31]; // A2, C3, G2, F2
+              playRunningBass(bassFreqs[currentBar], 0.18, 0.10);
+            }
+
+            // Sparkling, extremely happy sunrise pentatonic running lead melody
+            const calmMelody = [
+              // Joyful A Minor/C Major morning sunshine rise
+              440.00, 523.25, 587.33, 659.25, 523.25, 440.00, 587.33, 659.25,
+              // Bright, sweet G Major breeze chords
+              392.00, 493.88, 523.25, 587.33, 493.88, 392.00, 523.25, 587.33,
+              // Majestic high C Major climb
+              523.25, 587.33, 659.25, 783.99, 659.25, 523.25, 783.99, 880.00,
+              // Positive morning victory sweep
+              698.46, 783.99, 880.00, 1046.50, 880.00, 698.46, 783.99, 659.25
+            ];
+            const currentFreq = calmMelody[musicStep % 32];
+            // Beautiful bright chime notes
+            playRunningLead(currentFreq, 0.22, 0.038);
+            
+            musicStep = (musicStep + 1) % 32;
+          } catch(e) {}
+        }, stepDuration * 1000);
+      }
+
+      function stopAwesomeMusic() {
+        if (musicInterval) {
+          clearInterval(musicInterval);
+          musicInterval = null;
+        }
+      }
+
+      // Beautiful clean low crash bump with zero hiss noise when hitting obstacles
+      function playSynthesizedCrashSound() {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          let osc = audioCtx.createOscillator();
+          let gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.22);
+          
+          gain.gain.setValueAtTime(0.45, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+          
+          osc.connect(gain);
+          gain.connect(masterGainNode || audioCtx.destination);
+          
+          osc.start(0);
+          osc.stop(audioCtx.currentTime + 0.25);
+        } catch(e) {}
+      }
+
+      // Magical chord bell ring when completing tasks or completing checkings
+      function playSynthesizedBoostSound() {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          const now = audioCtx.currentTime;
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // Beautiful high C-major chord bells
+          notes.forEach((freq, index) => {
+            const delay = index * 0.04;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + delay);
+            
+            gain.gain.setValueAtTime(0.08, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.2);
+            
+            osc.connect(gain);
+            gain.connect(masterGainNode || audioCtx.destination);
+            
+            osc.start(now + delay);
+            osc.stop(now + delay + 0.22);
+          });
+        } catch(e) {}
+      }
+
+      // Soft water droplet condensation tick feedback for buttons
+      function playMutedBeepFeedback() {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          let osc = audioCtx.createOscillator();
+          let gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.05);
+          
+          gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.06);
+          
+          osc.connect(gain);
+          gain.connect(masterGainNode || audioCtx.destination);
+          
+          osc.start(0);
+          osc.stop(audioCtx.currentTime + 0.06);
+        } catch(e) {}
+      }
+
+      // Melodious synthetic chime sequence upon completing every lap
+      function playLapCompletionCelebration() {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          const now = audioCtx.currentTime;
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 (Bright rising major chords!)
+          notes.forEach((freq, idx) => {
+            const delay = idx * 0.12;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + delay);
+            osc.frequency.exponentialRampToValueAtTime(freq * 1.15, now + delay + 0.35);
+            
+            gain.gain.setValueAtTime(0.12, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.38);
+            
+            osc.connect(gain);
+            gain.connect(masterGainNode || audioCtx.destination);
+            
+            osc.start(now + delay);
+            osc.stop(now + delay + 0.4);
+          });
+        } catch(e) {}
+      }
+
+      // Spectacular cinematic multivoiced brass and chime fanfare when completing 5 laps
+      function playSpectacularVictoryFanfare() {
+        if (!audioCtx || mainAudioMuted) return;
+        try {
+          const now = audioCtx.currentTime;
+          // Ascending major high power fanfare sequence
+          const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const delay = idx * 0.15;
+            
+            // Sawtooth energetic horn voice
+            const oscSaw = audioCtx.createOscillator();
+            const gainSaw = audioCtx.createGain();
+            oscSaw.type = 'sawtooth';
+            oscSaw.frequency.setValueAtTime(freq, now + delay);
+            
+            gainSaw.gain.setValueAtTime(0.10, now + delay);
+            gainSaw.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.65);
+            
+            oscSaw.connect(gainSaw);
+            gainSaw.connect(masterGainNode || audioCtx.destination);
+            oscSaw.start(now + delay);
+            oscSaw.stop(now + delay + 0.7);
+            
+            // Sub warm underlying base chord
+            const oscSine = audioCtx.createOscillator();
+            const gainSine = audioCtx.createGain();
+            oscSine.type = 'sine';
+            oscSine.frequency.setValueAtTime(freq * 0.5, now + delay);
+            
+            gainSine.gain.setValueAtTime(0.12, now + delay);
+            gainSine.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.75);
+            
+            oscSine.connect(gainSine);
+            gainSine.connect(masterGainNode || audioCtx.destination);
+            oscSine.start(now + delay);
+            oscSine.stop(now + delay + 0.8);
+          });
+
+          // Secondary sparkling crystallised chime finish cascade
+          setTimeout(() => {
+            if (!audioCtx || mainAudioMuted) return;
+            const chimes = [880.0, 1046.5, 1318.5, 1568.0, 2093.0];
+            const chimeStart = audioCtx.currentTime;
+            chimes.forEach((freq, idx) => {
+              const delay = idx * 0.08;
+              const o = audioCtx.createOscillator();
+              const g = audioCtx.createGain();
+              o.type = 'sine';
+              o.frequency.setValueAtTime(freq, chimeStart + delay);
+              
+              g.gain.setValueAtTime(0.10, chimeStart + delay);
+              g.gain.exponentialRampToValueAtTime(0.001, chimeStart + delay + 0.9);
+              
+              o.connect(g);
+              g.connect(masterGainNode || audioCtx.destination);
+              o.start(chimeStart + delay);
+              o.stop(chimeStart + delay + 0.95);
+            });
+          }, 850);
+        } catch(e) {}
+      }
+
+      // INITIATE GAME GRAPHICS ENGINE
+      function init3DEngine() {
+        // SCENE SETUP
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0xfbcfe8, 0.0013); // soft refreshing rose pink morning mist on horizon
+
+        // BEAUTIFUL REFRESHING SUNRISE LIGHT SKY BLUE
+        scene.background = new THREE.Color(0xbae6fd);
+
+        // CHASE CAMERA CONFIGURATION
+        camera = new THREE.PerspectiveCamera(63, window.innerWidth / window.innerHeight, 0.1, 1500);
+
+        // WEBGL RENDERER CONFIG
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        canvasContainer.appendChild(renderer.domElement);
+
+        clock = new THREE.Clock();
+
+        // NATURAL SCENE SUNLIGHTS
+        const ambientLight = new THREE.AmbientLight(0xfff3e0, 0.48); // warm morning creamy ambient
+        scene.add(ambientLight);
+
+        // Direct radiant gold morning sun rising in the eastern sky
+        const mainSun = new THREE.DirectionalLight(0xfffbeb, 2.6);
+        mainSun.position.set(240, 110, 180); // Higher angled morning sun
+        mainSun.castShadow = true;
+        mainSun.shadow.mapSize.width = 1024;
+        mainSun.shadow.mapSize.height = 1024;
+        mainSun.shadow.camera.near = 0.5;
+        mainSun.shadow.camera.far = 1000;
+        let d = 300;
+        mainSun.shadow.camera.left = -d;
+        mainSun.shadow.camera.right = d;
+        mainSun.shadow.camera.top = d;
+        mainSun.shadow.camera.bottom = -d;
+        scene.add(mainSun);
+
+        // Fresh blue morning sky bounce to green park lawn bounce hemisphere light
+        const skyGlow = new THREE.HemisphereLight(0xbae6fd, 0x15803d, 0.55);
+        scene.add(skyGlow);
+
+        // CONTAINER GROUPS
+        particleGroup = new THREE.Group();
+        scene.add(particleGroup);
+
+        // GENERATE WORLD SCENERY
+        createGlobalEnvironment();
+        createStadiumCore();
+        createAthleticTrack();
+        createStartingLandmark();
+        createPlayerCapsule();
+        createOpponentRunners();
+        createSpeedBoostPads();
+        createAtmosphericDust();
+      }
+
+      // WORLD GENERATION ROUTINES
+
+      function createGlobalEnvironment() {
+        // Huge circular grass lawn field beneath the stadium & track structures
+        const lawnGroup = new THREE.Group();
+        
+        // Massive grass terrain slab
+        const lawnGeo = new THREE.CylinderGeometry(800, 800, 2, 64);
+        const lawnMat = new THREE.MeshStandardMaterial({
+          color: 0x1c5835, // Rich park grass green
+          roughness: 0.95,
+          metalness: 0.05
+        });
+        const lawn = new THREE.Mesh(lawnGeo, lawnMat);
+        lawn.position.y = -1.1; // flat on floor
+        lawn.receiveShadow = true;
+        lawnGroup.add(lawn);
+
+        // Paved Slate Cement Plaza between the running track and the stadium, replacing all grass inside the track loop!
+        const plazaGeo = new THREE.CylinderGeometry(131.5, 131.5, 2.05, 64);
+        const plazaMat = new THREE.MeshStandardMaterial({
+          color: 0x334155, // Clean slate dark grey paved asphalt plaza matching the photograph
+          roughness: 0.85,
+          metalness: 0.1,
+        });
+        const plaza = new THREE.Mesh(plazaGeo, plazaMat);
+        plaza.position.y = -1.08; // sitting slightly above the lawn so it overrides the green grass perfectly!
+        plaza.receiveShadow = true;
+        lawnGroup.add(plaza);
+
+        // Scatter 130 lush low-poly trees around the stadium perimeter to represent the GBK green park
+        const treeTrunkGeo = new THREE.CylinderGeometry(0.5, 0.8, 8, 8);
+        const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x542c13, roughness: 0.9 });
+        
+        const treeLeavesMat1 = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.85 }); // mid green
+        const treeLeavesMat2 = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.9 });  // dark forest green
+        const treeLeavesMat3 = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.95 }); // deep emerald green
+
+        const treeCount = 130;
+        for (let i = 0; i < treeCount; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          // Spawn trees strictly outside the outer edge parameter to keep the track and inner stadium area clean
+          // The track is at trackRadius (150). Inner side is the stadium concrete base. Outer side is the park.
+          let radius = 195 + Math.random() * 260;
+
+          const tx = Math.cos(angle) * radius;
+          const tz = Math.sin(angle) * radius;
+
+          const individualTree = new THREE.Group();
+          individualTree.position.set(tx, -0.6, tz);
+          const scale = 0.65 + Math.random() * 0.9;
+          individualTree.scale.set(scale, scale, scale);
+
+          // Trunk
+          const trunk = new THREE.Mesh(treeTrunkGeo, treeTrunkMat);
+          trunk.position.y = 4;
+          trunk.castShadow = true;
+          individualTree.add(trunk);
+
+          // Multi-spherical foliage to look natural
+          const leavesMats = [treeLeavesMat1, treeLeavesMat2, treeLeavesMat3];
+          const foliageMat = leavesMats[Math.floor(Math.random() * leavesMats.length)];
+          
+          const foliage1 = new THREE.Mesh(new THREE.SphereGeometry(3.6, 6, 6), foliageMat);
+          foliage1.position.set(0, 8.5, 0);
+          foliage1.castShadow = true;
+          individualTree.add(foliage1);
+
+          const foliage2 = new THREE.Mesh(new THREE.SphereGeometry(2.8, 6, 6), foliageMat);
+          foliage2.position.set(1.4, 9.5, 1.0);
+          foliage2.castShadow = true;
+          individualTree.add(foliage2);
+
+          const foliage3 = new THREE.Mesh(new THREE.SphereGeometry(2.5, 6, 6), foliageMat);
+          foliage3.position.set(-1.2, 10.0, -0.8);
+          foliage3.castShadow = true;
+          individualTree.add(foliage3);
+
+          lawnGroup.add(individualTree);
+        }
+
+        // Procedurally add beautiful bushes and plants outside of the running track (right & left area)
+        const bushGeo1 = new THREE.SphereGeometry(1.6, 6, 6);
+        const bushGeo2 = new THREE.SphereGeometry(1.1, 5, 5);
+        const bushMat1 = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 }); // Vibrantly bright green
+        const bushMat2 = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.85 }); // Medium green
+        const bushMat3 = new THREE.MeshStandardMaterial({ color: 0x86efac, roughness: 0.95 }); // Soft light green
+        const bushMat4 = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.9 }); // Forest shrub green
+
+        const bushMats = [bushMat1, bushMat2, bushMat3, bushMat4];
+
+        const plantCount = 550;
+        for (let i = 0; i < plantCount; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          // Spawn bushes strictly outside the outer track area margin (from 173 to 225) to clear the inner stadium left lane border
+          const r = 173 + Math.random() * 52;
+
+          const px = Math.cos(angle) * r;
+          const pz = Math.sin(angle) * r;
+
+          const bushGroup = new THREE.Group();
+          bushGroup.position.set(px, -1.0, pz);
+
+          // Give random small cluster shapes
+          const numSpheres = 2 + Math.floor(Math.random() * 3);
+          const activeMat = bushMats[Math.floor(Math.random() * bushMats.length)];
+
+          for (let s = 0; s < numSpheres; s++) {
+            const sizeGeo = Math.random() < 0.45 ? bushGeo1 : bushGeo2;
+            const sphereMesh = new THREE.Mesh(sizeGeo, activeMat);
+            sphereMesh.castShadow = false;
+            sphereMesh.receiveShadow = false;
+
+            // Offset spheres in a cluster slightly to create a natural bush body
+            const ox = (Math.random() * 2.0 - 1.0) * 1.2;
+            const oz = (Math.random() * 2.0 - 1.0) * 1.2;
+            const oy = 0.4 + Math.random() * 1.0;
+            sphereMesh.position.set(ox, oy, oz);
+            bushGroup.add(sphereMesh);
+          }
+
+          // Sprinkle gorgeous tiny colorful wildflower bulbs on top of 35% of the shrubbery
+          if (Math.random() < 0.35) {
+            const flowerColors = [0xf43f5e, 0xf97316, 0x3b82f6, 0xec4899, 0xfacc15]; // Morning pink, orange, sky blue, fuchsia, yellow
+            const flowerCol = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+            const flowerMat = new THREE.MeshStandardMaterial({
+              color: flowerCol,
+              roughness: 0.8,
+              emissive: flowerCol,
+              emissiveIntensity: 0.35
+            });
+            const flowerGeo = new THREE.DodecahedronGeometry(0.38);
+            const flowerCount = 1 + Math.floor(Math.random() * 3);
+            for (let f = 0; f < flowerCount; f++) {
+              const flMesh = new THREE.Mesh(flowerGeo, flowerMat);
+              flMesh.position.set(
+                (Math.random() * 2.0 - 1.0) * 0.9,
+                1.4 + Math.random() * 0.6,
+                (Math.random() * 2.0 - 1.0) * 0.9
+              );
+              bushGroup.add(flMesh);
+            }
+          }
+
+          // Random overall scaling for variation
+          const grpScale = 0.5 + Math.random() * 0.7;
+          bushGroup.scale.set(grpScale, grpScale, grpScale);
+
+          lawnGroup.add(bushGroup);
+        }
+
+        // Jakarta Downtown Skyline: 35 stunning skyscraper modern buildings in the background
+        const bldgCount = 45; // Increased density for real Sudirman/Senayan look
+        const bldgGroup = new THREE.Group();
+        
+        // Materials for shiny high-rise city towers
+        const glassMat = new THREE.MeshStandardMaterial({
+          color: 0x1d4ed8, // Crisp Deep blue reflective glass
+          roughness: 0.08,
+          metalness: 0.95
+        });
+        const lightConcreteMat = new THREE.MeshStandardMaterial({
+          color: 0xb0c4de, // Sophisticated Light Steel Blue / Silver metal plating
+          roughness: 0.28,
+          metalness: 0.75
+        });
+        const slateMetMat = new THREE.MeshStandardMaterial({
+          color: 0x334155, // Premium Architectural Slate Grey titanium
+          roughness: 0.22,
+          metalness: 0.85
+        });
+        const bronzeMatPremium = new THREE.MeshStandardMaterial({
+          color: 0xaa7c11, // Luxurious corporate bronze alloy tower look
+          roughness: 0.25,
+          metalness: 0.85
+        });
+
+        for (let i = 0; i < bldgCount; i++) {
+          const angle = (i / bldgCount) * Math.PI * 2 + Math.random() * 0.12;
+          const dist = 540 + Math.random() * 180; // far background boundary
+          const bx = Math.cos(angle) * dist;
+          const bz = Math.sin(angle) * dist;
+
+          const bh = 130 + Math.random() * 210; // Extra tall skyscrapers
+          const bw = 24 + Math.random() * 24;
+          const bd = 20 + Math.random() * 18;
+
+          const mats = [glassMat, lightConcreteMat, slateMetMat, bronzeMatPremium];
+          const activeMat = mats[i % mats.length];
+
+          const bldg = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), activeMat);
+          bldg.position.set(bx, bh / 2 - 12, bz);
+          bldg.castShadow = true;
+          
+          // Add procedural vertical or horizontal structural glowing bands (Jakarta high-rise lighting)
+          const glowingBandGeo = new THREE.BoxGeometry(bw + 0.4, 3, bd + 0.4);
+          const glowingBandMat = new THREE.MeshStandardMaterial({
+            color: 0x38bdf8, // Ice blue light strip
+            emissive: 0x38bdf8,
+            emissiveIntensity: 2.2,
+            roughness: 0.1
+          });
+          
+          // Place alternating neon bands near the crown/roof
+          const bandCount = 2 + Math.floor(Math.random() * 3);
+          for (let b = 0; b < bandCount; b++) {
+            const bandNode = new THREE.Mesh(glowingBandGeo, glowingBandMat);
+            bandNode.position.y = (bh / 2) - 8 - (b * (20 + Math.random() * 15));
+            bldg.add(bandNode);
+          }
+
+          // Modern slanted/angular rooftops or spires corresponding to SCBD Jakarta
+          if (Math.random() < 0.5) {
+            const spireGeo = new THREE.CylinderGeometry(0.1, 0.4, 35, 4);
+            const spireMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 });
+            const spire = new THREE.Mesh(spireGeo, spireMat);
+            spire.position.y = bh / 2 + 17.5;
+            bldg.add(spire);
+
+            // Red aviation warning beacon on the peak
+            const beaconGeo = new THREE.SphereGeometry(1.2, 4, 4);
+            const beaconMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+            const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+            beacon.position.y = 17.5;
+            spire.add(beacon);
+          } else {
+            // Slanted roof cap
+            const capGeo = new THREE.BoxGeometry(bw + 0.2, 4, bd + 0.2);
+            const capMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
+            const cap = new THREE.Mesh(capGeo, capMat);
+            cap.position.y = bh / 2 + 1;
+            cap.rotation.x = 0.2 + Math.random() * 0.2; // slanted SCBD tower geometric roof look
+            bldg.add(cap);
+          }
+          
+          bldgGroup.add(bldg);
+        }
+        lawnGroup.add(bldgGroup);
+
+        // Generate 18 procedurally styled modern park lampposts along the outer loop tarmac boundary
+        const lamppostQty = 18;
+        const lampGroup = new THREE.Group();
+        for (let i = 0; i < lamppostQty; i++) {
+          const angle = (i / lamppostQty) * Math.PI * 2;
+          const radius = 170.0; // Situated right at the outer edge of the running track lanes!
+          const lx = Math.cos(angle) * radius;
+          const lz = Math.sin(angle) * radius;
+          
+          const post = new THREE.Group();
+          post.position.set(lx, 0, lz);
+          
+          // Vertical metal pole
+          const poleGeo = new THREE.CylinderGeometry(0.2, 0.35, 14, 6);
+          const poleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.3 });
+          const pole = new THREE.Mesh(poleGeo, poleMat);
+          pole.position.y = 7;
+          pole.castShadow = true;
+          post.add(pole);
+          
+          // Horizontal cantilever light fixtures pointing inwards onto lanes (+Z is towards center)
+          const lampArmGeo = new THREE.BoxGeometry(0.24, 0.24, 2.5);
+          const lampArm = new THREE.Mesh(lampArmGeo, poleMat);
+          lampArm.position.set(0, 13.8, 0.85);
+          post.add(lampArm);
+          
+          // Glowing lamp heads extending over lanes
+          const lampHeadGeo = new THREE.BoxGeometry(0.8, 0.4, 1.2);
+          const lampHeadMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: 0xfef08a, // Soft warm glow emission
+            emissiveIntensity: 2.0,
+            metalness: 0.5
+          });
+          const lampHead = new THREE.Mesh(lampHeadGeo, lampHeadMat);
+          lampHead.position.set(0, 13.8, 2.0);
+          post.add(lampHead);
+          
+          // Downwards lighting projection cone faking real light spread onto track surface
+          const coneGeo = new THREE.ConeGeometry(3.5, 13, 12, 1, true);
+          const coneMat = new THREE.MeshBasicMaterial({
+            color: 0xfef08a,
+            transparent: true,
+            opacity: 0.12,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+          });
+          const cone = new THREE.Mesh(coneGeo, coneMat);
+          cone.position.set(0, 6.8, 2.0);
+          cone.rotateX(-0.08); // tip slightly inwards onto track parameter
+          post.add(cone);
+          
+          // Face the lamp pointing directly inwards onto the running track center (0,0,0)
+          post.lookAt(new THREE.Vector3(0, 0, 0));
+          
+          lampGroup.add(post);
+        }
+        lawnGroup.add(lampGroup);
+
+        // Procedurally add morning clouds high up in the sky
+        cloudGroup = new THREE.Group();
+        const cloudGeo = new THREE.SphereGeometry(15, 6, 6);
+        const cloudMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.88
+        });
+        
+        const cloudsCount = 22;
+        for (let i = 0; i < cloudsCount; i++) {
+          const cloud = new THREE.Group();
+          // Position them in a large circle high above the stadium
+          const angle = (i / cloudsCount) * Math.PI * 2 + Math.random() * 0.4;
+          const r = 320 + Math.random() * 280;
+          const cx = Math.cos(angle) * r;
+          const cz = Math.sin(angle) * r;
+          const cy = 80 + Math.random() * 55;
+          cloud.position.set(cx, cy, cz);
+          
+          // Form each cloud using 3-5 overlapping-scale spheres
+          const spheresCount = 3 + Math.floor(Math.random() * 3);
+          for (let s = 0; s < spheresCount; s++) {
+            const sphere = new THREE.Mesh(cloudGeo, cloudMat);
+            const scaleX = 1.3 + Math.random() * 1.6;
+            const scaleY = 0.5 + Math.random() * 0.35;
+            const scaleZ = 1.3 + Math.random() * 1.3;
+            sphere.scale.set(scaleX, scaleY, scaleZ);
+            
+            // Offset sphere within cloud clump
+            sphere.position.set(
+              (Math.random() - 0.5) * 25,
+              (Math.random() - 0.5) * 6,
+              (Math.random() - 0.5) * 25
+            );
+            cloud.add(sphere);
+          }
+          cloudGroup.add(cloud);
+        }
+        scene.add(cloudGroup);
+
+        scene.add(lawnGroup);
+      }
+
+      function createStadiumCore() {
+        // Massive cylindrical stadium core inspired by Gelora Bung Karno structure
+        stadiumCore = new THREE.Group();
+
+        // High-definition Procedural Concrete & Lighting Texture for the Stadium Core building face
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Base concrete beige-gray
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Concrete tile pattern panel lines
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 3;
+        for (let x = 0; x < 512; x += 64) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 512);
+          ctx.stroke();
+        }
+        for (let y = 0; y < 512; y += 128) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(512, y);
+          ctx.stroke();
+          
+          // Draw elegant sets of high-contrast window slits / stadium portals
+          ctx.fillStyle = '#1e293b'; // Dark metal window casings
+          for (let x = 12; x < 512; x += 64) {
+             ctx.fillRect(x, y + 25, 14, 45);
+             ctx.fillRect(x + 24, y + 25, 14, 45);
+          }
+          
+          // Add inner glowing warm lights for active interior stadium corridors
+          ctx.fillStyle = '#fef08a'; // Bright cozy warm glow
+          for (let x = 12; x < 512; x += 64) {
+              ctx.fillRect(x + 4, y + 35, 6, 25);
+              ctx.fillRect(x + 28, y + 35, 6, 25);
+          }
+        }
+        
+        const facadeTex = new THREE.CanvasTexture(canvas);
+        facadeTex.wrapS = THREE.RepeatWrapping;
+        facadeTex.wrapT = THREE.RepeatWrapping;
+        facadeTex.repeat.set(16, 4); // Repeat to give tiny massive concrete panel grid details
+
+        // 1. Layered circular platforms represent base structural concrete sitting directly on left edge of the track
+        const baseGeo = new THREE.CylinderGeometry(121, 129.5, 14, 64);
+        const baseMat = new THREE.MeshStandardMaterial({
+          color: 0xe2e8f0, // Clean beige-white concrete base
+          roughness: 0.85,
+          metalness: 0.12
+        });
+        const platformBase = new THREE.Mesh(baseGeo, baseMat);
+        platformBase.position.y = -3;
+        stadiumCore.add(platformBase);
+
+        // 2. Multi-tier Concrete Balcony Rings / Terraces replicating the open stadium levels
+        const terraceCount = 3;
+        const terraceHeights = [18, 38, 58];
+        const terraceRadii = [118, 118.5, 119];
+        for (let t = 0; t < terraceCount; t++) {
+          const terrGeo = new THREE.CylinderGeometry(terraceRadii[t], terraceRadii[t] + 1.2, 2.5, 64, 1, true);
+          const terrMat = new THREE.MeshStandardMaterial({
+             color: 0xcbd5e1, // concrete slab gray
+             roughness: 0.72,
+             side: THREE.DoubleSide
+          });
+          const terrace = new THREE.Mesh(terrGeo, terrMat);
+          terrace.position.y = terraceHeights[t];
+          stadiumCore.add(terrace);
+        }
+
+        // 3. The Stadium Core cylinder facade with our gorgeous procedural textures
+        const coreGeo = new THREE.CylinderGeometry(112, 116, 75, 64, 1, true);
+        const coreMat = new THREE.MeshStandardMaterial({
+          map: facadeTex,
+          roughness: 0.65,
+          metalness: 0.15,
+          side: THREE.DoubleSide
+        });
+        const coreFacade = new THREE.Mesh(coreGeo, coreMat);
+        coreFacade.position.y = 35;
+        stadiumCore.add(coreFacade);
+
+        // 4. Iconic Slanted stadium concrete pillars skeleton structure supporting outer cantilever roof
+        const structuralColumnsGroup = new THREE.Group();
+        const pillarQty = 32;
+        const columnBaseRad = 122;
+        const columnTopRad = 115;
+
+        for (let i = 0; i < pillarQty; i++) {
+          const angle = (i / pillarQty) * Math.PI * 2;
+          const xBase = Math.cos(angle) * columnBaseRad;
+          const zBase = Math.sin(angle) * columnBaseRad;
+          
+          const xTop = Math.cos(angle) * columnTopRad;
+          const zTop = Math.sin(angle) * columnTopRad;
+
+          // Concrete pillars in clean light structural grey finish
+          const pillarGeo = new THREE.CylinderGeometry(1.2, 2.0, 78, 8);
+          const pillarMat = new THREE.MeshStandardMaterial({
+            color: 0xf1f5f9, // Polished white architectural concrete columns
+            roughness: 0.55,
+            metalness: 0.08
+          });
+          const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+          pillar.position.set((xBase + xTop)/2, 35, (zBase + zTop)/2);
+          
+          // Face pointing inwards
+          pillar.lookAt(new THREE.Vector3(0, 35, 0));
+          pillar.rotateX(Math.PI / 2);
+          structuralColumnsGroup.add(pillar);
+        }
+        stadiumCore.add(structuralColumnsGroup);
+
+        // 5. GIGANTIC EXTERIOR METAL SPACE-FRAME TRUSS CANOPY (As per photo, sweeping curved steel crossbeams)
+        const roofTrussGroup = new THREE.Group();
+        const metalMat = new THREE.MeshStandardMaterial({
+          color: 0xdde3ea, // Metallic white/silver steel frame matching photo
+          metalness: 0.9,
+          roughness: 0.18
+        });
+
+        // Horizontal concentric circular steel rails curving upwards
+        const railCounts = 6;
+        for (let r = 0; r < railCounts; r++) {
+          const radius = 110 + (r / (railCounts - 1)) * 32;
+          const railGeo = new THREE.TorusGeometry(radius, 0.45, 8, 96);
+          const rail = new THREE.Mesh(railGeo, metalMat);
+          rail.position.y = 75 + (r * 1.5); // Sweeps up in a subtle canopy curve!
+          rail.rotateX(Math.PI / 2);
+          roofTrussGroup.add(rail);
+        }
+
+        // Crisscrossing diagonal structural steel truss girders
+        const strutCount = 96;
+        for (let s = 0; s < strutCount; s++) {
+          const angle = (s / strutCount) * Math.PI * 2;
+          const nextAngle1 = ((s + 1.25) / strutCount) * Math.PI * 2;
+          const nextAngle2 = ((s - 1.25) / strutCount) * Math.PI * 2;
+
+          const rIn = 110;
+          const rOut = 142;
+
+          // Inner to outer diagonal 1
+          const p1_start = new THREE.Vector3(Math.cos(angle) * rIn, 75, Math.sin(angle) * rIn);
+          const p1_end = new THREE.Vector3(Math.cos(nextAngle1) * rOut, 82.5, Math.sin(nextAngle1) * rOut);
+          
+          // Outer to inner diagonal 2
+          const p2_start = new THREE.Vector3(Math.cos(angle) * rOut, 82.5, Math.sin(angle) * rOut);
+          const p2_end = new THREE.Vector3(Math.cos(nextAngle2) * rIn, 75, Math.sin(nextAngle2) * rIn);
+
+          // Helper to create cylinder beams
+          const addStrut = (pA, pB) => {
+            const dist = pA.distanceTo(pB);
+            const cyGeo = new THREE.CylinderGeometry(0.18, 0.18, dist, 5);
+            const cy = new THREE.Mesh(cyGeo, metalMat);
+            cy.position.copy(pA).add(pB).multiplyScalar(0.5);
+            cy.lookAt(pB);
+            cy.rotateX(Math.PI / 2);
+            roofTrussGroup.add(cy);
+          };
+
+          addStrut(p1_start, p1_end);
+          addStrut(p2_start, p2_end);
+        }
+        stadiumCore.add(roofTrussGroup);
+
+        // 6. Cantilever Under-Canopy Steel Support Truss Brackets
+        const trussGroup = new THREE.Group();
+        for (let i = 0; i < pillarQty; i++) {
+          const angle = (i / pillarQty) * Math.PI * 2;
+          
+          // Radial structural beam extending outwards horizontally to brace the outer ring
+          const trussArmGeo = new THREE.BoxGeometry(0.8, 1.4, 34);
+          const trussMat = new THREE.MeshStandardMaterial({
+            color: 0x475569, // Solid technical structural steel grey
+            metalness: 0.82,
+            roughness: 0.28
+          });
+          const trussArm = new THREE.Mesh(trussArmGeo, trussMat);
+          trussArm.position.set(Math.cos(angle) * 126, 74.2, Math.sin(angle) * 126);
+          trussArm.lookAt(new THREE.Vector3(0, 74.2, 0)); // Point towards center
+          trussGroup.add(trussArm);
+
+          // Diagonal support strut pushing from concrete column up to the outer canopy edge
+          const strutGeo = new THREE.CylinderGeometry(0.35, 0.5, 20, 6);
+          const strut = new THREE.Mesh(strutGeo, trussMat);
+          strut.position.set(Math.cos(angle) * 132, 66.5, Math.sin(angle) * 132);
+          strut.lookAt(new THREE.Vector3(Math.cos(angle) * 122, 55, Math.sin(angle) * 122));
+          strut.rotateX(Math.PI / 2);
+          trussGroup.add(strut);
+        }
+        stadiumCore.add(trussGroup);
+
+        // 7. MULTI-TIER SLANTED CONCOURSE RIBS & BALLUSTRADES (Matches photo balconies)
+        const finQty = 64;
+        const finGroup = new THREE.Group();
+        const finMat = new THREE.MeshStandardMaterial({
+          color: 0xf8fafc, // Pure clean white concrete to match photo
+          roughness: 0.52,
+          metalness: 0.1
+        });
+        
+        const tierHeights2 = [0, 18, 38, 58];
+        const outRadii2 = [130, 127.5, 125, 122.5];
+
+        for (let t = 0; t < 3; t++) {
+          const hStart = tierHeights2[t];
+          const hEnd = tierHeights2[t+1];
+          const rBase = outRadii2[t];
+
+          // Floor platforms
+          const floorGeo = new THREE.CylinderGeometry(rBase, rBase + 0.5, 1.2, 64);
+          const floorMesh = new THREE.Mesh(floorGeo, finMat);
+          floorMesh.position.y = hEnd;
+          stadiumCore.add(floorMesh);
+
+          // Horizontal protective hand railings (silver/chrome look) - 3 concentric rails above balcony floors
+          const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.1 });
+          for (let r = 0; r < 3; r++) {
+            const tempRailGeo = new THREE.TorusGeometry(rBase + 0.3, 0.08, 6, 96);
+            const tempRail = new THREE.Mesh(tempRailGeo, railMat);
+            tempRail.position.y = hEnd + 0.4 + (r * 0.4);
+            tempRail.rotateX(Math.PI / 2);
+            stadiumCore.add(tempRail);
+          }
+
+          // vertical white support ribs (finQty slices)
+          for (let f = 0; f < finQty; f++) {
+            const angle = (f / finQty) * Math.PI * 2;
+            const fx = Math.cos(angle) * rBase;
+            const fz = Math.sin(angle) * rBase;
+
+            const finGeo = new THREE.BoxGeometry(0.35, hEnd - hStart, 2.2);
+            const fin = new THREE.Mesh(finGeo, finMat);
+            fin.position.set(fx, (hStart + hEnd) / 2, fz);
+            fin.lookAt(new THREE.Vector3(0, (hStart + hEnd) / 2, 0));
+            // Tilt outwards matching the stadium frame slope
+            fin.rotateX(0.04);
+            finGroup.add(fin);
+          }
+        }
+        stadiumCore.add(finGroup);
+
+        // 8. Large glowing halo neon energy rings on top & mid cylinder
+        const topHaloGeo = new THREE.TorusGeometry(116, 0.8, 8, 48);
+        const topHaloMat = new THREE.MeshStandardMaterial({
+          color: 0xef4444, // Bright running track red halo
+          emissive: 0xef4444,
+          emissiveIntensity: 1.5,
+          transparent: true,
+          opacity: 0.85
+        });
+        const topHalo = new THREE.Mesh(topHaloGeo, topHaloMat);
+        topHalo.position.y = 76.5;
+        topHalo.rotateX(Math.PI / 2);
+        stadiumCore.add(topHalo);
+
+        const midHaloGeo = new THREE.TorusGeometry(118.5, 0.4, 8, 48);
+        const midHaloMat = new THREE.MeshStandardMaterial({
+          color: 0xf97316,
+          emissive: 0xf97316,
+          emissiveIntensity: 1.0,
+          transparent: true,
+          opacity: 0.7
+        });
+        const midHalo = new THREE.Mesh(midHaloGeo, midHaloMat);
+        midHalo.position.y = 35;
+        midHalo.rotateX(Math.PI / 2);
+        stadiumCore.add(midHalo);
+
+        // 9. Ceremonial Stadium Monumental Elements (Emblem, Flagpole, and Hero Sculpture as in photo!)
+        const ceremonialGroup = new THREE.Group();
+
+        // 9a. Standard Flagpole with Red-and-White Sporty/National Flag
+        const flagAngle = -0.06;
+        const flagR = 120;
+        const flagX = Math.cos(flagAngle) * flagR;
+        const flagZ = Math.sin(flagAngle) * flagR;
+
+        // Flagpole: tall polished silver cylinder
+        const poleGeo = new THREE.CylinderGeometry(0.18, 0.28, 28, 8);
+        const metalMat2 = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.88, roughness: 0.1 });
+        const flagpole = new THREE.Mesh(poleGeo, metalMat2);
+        flagpole.position.set(flagX, 14, flagZ);
+        ceremonialGroup.add(flagpole);
+
+        // Double-sided fabric mesh for red-and-white waved flag
+        const flagGroup = new THREE.Group();
+        flagGroup.position.set(flagX, 24, flagZ);
+
+        const redHalfGeo = new THREE.BoxGeometry(0.2, 1.8, 3.4);
+        const redHalfMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.9 });
+        const redHalf = new THREE.Mesh(redHalfGeo, redHalfMat);
+        redHalf.position.set(0, 0.9, 1.7);
+        flagGroup.add(redHalf);
+
+        const whiteHalfGeo = new THREE.BoxGeometry(0.2, 1.8, 3.4);
+        const whiteHalfMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 });
+        const whiteHalf = new THREE.Mesh(whiteHalfGeo, whiteHalfMat);
+        whiteHalf.position.set(0, -0.9, 1.7);
+        flagGroup.add(whiteHalf);
+
+        // Orient flag so it waves beautifully relative to the wind
+        flagGroup.lookAt(new THREE.Vector3(flagX * 1.5, 24, flagZ * 0.5));
+        ceremonialGroup.add(flagGroup);
+
+        // 9b. Golden Eagle Coat of Arms Emblem (Garuda Pancasila) on Central Facade Wall
+        const emblemAngle = 0.0;
+        const emblemR = 117.8;
+        const emblemX = Math.cos(emblemAngle) * emblemR;
+        const emblemZ = Math.sin(emblemAngle) * emblemR;
+
+        const emblemGroup = new THREE.Group();
+        emblemGroup.position.set(emblemX, 11, emblemZ);
+        emblemGroup.lookAt(new THREE.Vector3(emblemX * 1.5, 11, emblemZ * 1.5));
+
+        const goldMat = new THREE.MeshStandardMaterial({
+          color: 0xeab308, // Rich majestic golden gold
+          metalness: 0.92,
+          roughness: 0.2,
+          emissive: 0xca8a04,
+          emissiveIntensity: 0.25
+        });
+
+        // Golden Shield anchor body
+        const shieldBack = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 0.45), goldMat);
+        emblemGroup.add(shieldBack);
+
+        // Golden wings spreading out
+        const wingL = new THREE.Mesh(new THREE.ConeGeometry(0.65, 3.4, 4), goldMat);
+        wingL.position.set(-1.8, 0.3, 0);
+        wingL.rotation.z = Math.PI / 3.4;
+        wingL.scale.set(1, 1, 0.45);
+        emblemGroup.add(wingL);
+
+        const wingR = new THREE.Mesh(new THREE.ConeGeometry(0.65, 3.4, 4), goldMat);
+        wingR.position.set(1.8, 0.3, 0);
+        wingR.rotation.z = -Math.PI / 3.4;
+        wingR.scale.set(1, 1, 0.45);
+        emblemGroup.add(wingR);
+
+        ceremonialGroup.add(emblemGroup);
+
+        // 9c. Monumental Ceremonial Sports Archery Sculpture standing prominently on trackside concourse
+        const statueAngle = 0.06;
+        const statueR = 119;
+        const statX = Math.cos(statueAngle) * statueR;
+        const statZ = Math.sin(statueAngle) * statueR;
+
+        const statueGroup = new THREE.Group();
+        statueGroup.position.set(statX, -1, statZ);
+
+        // Pedestal base block (slate gray matching image concrete block)
+        const pedestalGeo = new THREE.BoxGeometry(4.8, 4.4, 4.8);
+        const pedestalMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.82 });
+        const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
+        pedestal.position.y = 2.2;
+        pedestal.receiveShadow = true;
+        pedestal.castShadow = true;
+        statueGroup.add(pedestal);
+
+        // Stylized Archer / Sprinter Statue holding a classic bow
+        const bronzeMat = new THREE.MeshStandardMaterial({
+          color: 0x94a3b8, // Silver-bronze oxidized elegant weather concrete coating
+          roughness: 0.38,
+          metalness: 0.72
+        });
+
+        const statueBody = new THREE.Group();
+        statueBody.position.y = 4.4;
+
+        // Torso, head, limbs
+        const sTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.28, 1.8), bronzeMat);
+        sTorso.position.y = 1.6;
+        sTorso.rotation.x = 0.35; // Leaning forward heroically
+        statueBody.add(sTorso);
+
+        const sHead = new THREE.Mesh(new THREE.SphereGeometry(0.35), bronzeMat);
+        sHead.position.set(0, 2.7, -0.4);
+        statueBody.add(sHead);
+
+        // Dynamic Archer arm drawing bow
+        const sArmL = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 1.4), bronzeMat);
+        sArmL.position.set(-0.8, 1.8, 0);
+        sArmL.rotation.z = Math.PI / 2.2;
+        sArmL.rotation.y = -0.4;
+        statueBody.add(sArmL);
+
+        const sArmR = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 1.4), bronzeMat);
+        sArmR.position.set(0.6, 1.4, 0.5);
+        sArmR.rotation.x = Math.PI / 4;
+        sArmR.rotation.y = Math.PI / 3;
+        statueBody.add(sArmR);
+
+        // Archer Bow (held in left hand)
+        const bowGeo = new THREE.TorusGeometry(1.6, 0.08, 6, 24, Math.PI);
+        const bow = new THREE.Mesh(bowGeo, bronzeMat);
+        bow.position.set(-1.6, 1.8, -0.4);
+        bow.rotation.y = Math.PI / 2;
+        statueBody.add(bow);
+
+        // Lunge-posed powerful legs
+        const sLegL = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.12, 1.8), bronzeMat);
+        sLegL.position.set(-0.4, 0.8, -0.2);
+        sLegL.rotation.x = 0.55;
+        statueBody.add(sLegL);
+
+        const sLegR = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.12, 1.8), bronzeMat);
+        sLegR.position.set(0.4, 0.8, 0.4);
+        sLegR.rotation.x = -0.55;
+        statueBody.add(sLegR);
+
+        statueBody.scale.set(1.15, 1.15, 1.15);
+        statueBody.lookAt(new THREE.Vector3(statX * 1.5, 4.4, statZ * 1.5));
+        statueGroup.add(statueBody);
+
+        ceremonialGroup.add(statueGroup);
+        stadiumCore.add(ceremonialGroup);
+
+        // 10. Volumetric searchlights shining up from roof ring
+        const lightSourcesCount = 6;
+        for (let i = 0; i < lightSourcesCount; i++) {
+          const angle = (i / lightSourcesCount) * Math.PI * 2;
+          const sx = Math.cos(angle) * 116;
+          const sz = Math.sin(angle) * 116;
+
+          // The shiny fixture
+          const spotBoxGeo = new THREE.BoxGeometry(4, 4, 6);
+          const spotBoxMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness:0.8 });
+          const spotBox = new THREE.Mesh(spotBoxGeo, spotBoxMat);
+          spotBox.position.set(sx, 76.5, sz);
+          stadiumCore.add(spotBox);
+
+          // Volumetric translucent cylinder cone to faking real heavy stadium beam
+          const beamGeo = new THREE.ConeGeometry(5, 180, 16, 1, true);
+          const beamMat = new THREE.MeshBasicMaterial({
+            color: 0xfef08a, // Soft warm golden beam rays
+            transparent: true,
+            opacity: 0.1,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+          });
+          const beam = new THREE.Mesh(beamGeo, beamMat);
+          
+          // Center cone anchor point at top. By translating geometry, we rotate around the base!
+          beam.geometry.translate(0, 90, 0); 
+          beam.position.set(sx, 76.5, sz);
+          
+          // Random initial direction tilting outwards
+          beam.rotateZ(0.25);
+          beam.rotateY(angle);
+
+          searchlights.push(beam);
+          stadiumCore.add(beam);
+        }
+
+        scene.add(stadiumCore);
+      }
+
+      function createAthleticTrack() {
+        const trackGroup = new THREE.Group();
+
+        // Authentic banked running track using flattened torus
+        const roadGeo = new THREE.TorusGeometry(trackRadius, 20, 12, 128);
+        const roadMat = new THREE.MeshStandardMaterial({
+          color: 0x334155, // Clean dark slate asphalt tarmac grey
+          roughness: 0.88,
+          metalness: 0.08,
+        });
+        
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = Math.PI / 2;
+        road.scale.z = 0.04; // Squeege down into a super aerodynamic horizontal track profile
+        road.receiveShadow = true;
+        trackGroup.add(road);
+
+        // Concrete outer rim curbing
+        const outerRimGeo = new THREE.TorusGeometry(trackRadius + 19.5, 0.8, 8, 128);
+        const innerRimGeo = new THREE.TorusGeometry(trackRadius - 19.5, 0.8, 8, 128);
+        const rimMat = new THREE.MeshStandardMaterial({
+          color: 0x94a3b8, // Light concrete borders
+          roughness: 0.7,
+          metalness: 0.1
+        });
+
+        const outerRim = new THREE.Mesh(outerRimGeo, rimMat);
+        const innerRim = new THREE.Mesh(innerRimGeo, rimMat);
+        outerRim.rotation.x = Math.PI / 2;
+        innerRim.rotation.x = Math.PI / 2;
+        trackGroup.add(outerRim, innerRim);
+
+        // Neon track limits running around borders mapping GBK stadium aesthetic
+        const borderGlowGeo = new THREE.TorusGeometry(trackRadius + 19.4, 0.18, 8, 128);
+        const borderGlowMat = new THREE.MeshStandardMaterial({
+          color: 0xf59e0b, // Amber safety line
+          emissive: 0xf59e0b,
+          emissiveIntensity: 1.2
+        });
+        const borderGlow = new THREE.Mesh(borderGlowGeo, borderGlowMat);
+        borderGlow.rotation.x = Math.PI / 2;
+        borderGlow.position.y = 0.15; // slightly above tarmac
+        trackGroup.add(borderGlow);
+
+        // Authentic white lanes decals using slightly elevated nested rings.
+        const laneRadii = [trackRadius - 12, trackRadius - 4, trackRadius + 4, trackRadius + 12];
+        const laneLineMat = new THREE.MeshBasicMaterial({
+          color: 0xf1f5f9,
+          transparent: true,
+          opacity: 0.8,
+          side: THREE.DoubleSide
+        });
+
+        laneRadii.forEach((rad) => {
+          const ringGeo = new THREE.RingGeometry(rad - 0.15, rad + 0.15, 96);
+          const laneDecal = new THREE.Mesh(ringGeo, laneLineMat);
+          laneDecal.rotation.x = -Math.PI / 2;
+          laneDecal.position.y = 0.05; // slightly elevated above road to stave off z-fighting artifacts
+          trackGroup.add(laneDecal);
+        });
+
+        scene.add(trackGroup);
+      }
+
+      function createStartingLandmark() {
+        const landmarkGroup = new THREE.Group();
+
+        // 1. THE COLOSSAL GOLDEN SACRED STARTING TREE
+        const bigTreeGroup = new THREE.Group();
+        bigTreeGroup.position.set(186, -1.0, -14); // Next to the start line (at outer edge)
+        bigTreeGroup.scale.set(4.5, 4.5, 4.5);
+
+        // Huge organic old trunk
+        const trunkGeo = new THREE.CylinderGeometry(1.2, 1.8, 10, 8);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x422006, roughness: 0.95 });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 5;
+        trunk.castShadow = true;
+        bigTreeGroup.add(trunk);
+
+        // Gilded giant golden foliage spheres that look mystical under morning light
+        const foliageMat = new THREE.MeshStandardMaterial({
+          color: 0xfabf2c, // Glorious vibrant golden yellow morning foliage
+          roughness: 0.85
+        });
+
+        const foliage1 = new THREE.Mesh(new THREE.SphereGeometry(4.5, 8, 8), foliageMat);
+        foliage1.position.set(0, 10, 0);
+        foliage1.castShadow = true;
+        bigTreeGroup.add(foliage1);
+
+        const foliage2 = new THREE.Mesh(new THREE.SphereGeometry(3.5, 8, 8), foliageMat);
+        foliage2.position.set(-2.8, 8.5, 1.5);
+        foliage2.castShadow = true;
+        bigTreeGroup.add(foliage2);
+
+        const foliage3 = new THREE.Mesh(new THREE.SphereGeometry(3.5, 8, 8), foliageMat);
+        foliage3.position.set(2.8, 8.5, -1.5);
+        foliage3.castShadow = true;
+        bigTreeGroup.add(foliage3);
+
+        const foliage4 = new THREE.Mesh(new THREE.SphereGeometry(2.8, 8, 8), foliageMat);
+        foliage4.position.set(1.5, 11.5, 2.0);
+        foliage4.castShadow = true;
+        bigTreeGroup.add(foliage4);
+
+        landmarkGroup.add(bigTreeGroup);
+
+        // 2. THE GRAND CYBER STARTING ARCHWAY (Straddling the track at angle = 0, which corresponds to (150, 0, 0))
+        const archway = new THREE.Group();
+        archway.position.set(150, 0.80, 0);
+
+        const metalMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b, // Dark industrial metallic legs
+          roughness: 0.25,
+          metalness: 0.9
+        });
+        
+        const neonOrangeMat = new THREE.MeshStandardMaterial({
+          color: 0xf97316,
+          emissive: 0xf97316,
+          emissiveIntensity: 3.5
+        });
+
+        const neonCyanMat = new THREE.MeshStandardMaterial({
+          color: 0x22d3ee,
+          emissive: 0x22d3ee,
+          emissiveIntensity: 3.5
+        });
+
+        // Left Pillar (Inside Track margin)
+        const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 21, 8), metalMat);
+        leftPillar.position.set(-24.5, 10.5, 0);
+        leftPillar.castShadow = true;
+        archway.add(leftPillar);
+
+        // Right Pillar (Outside Track margin)
+        const rightPillar = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 21, 8), metalMat);
+        rightPillar.position.set(24.5, 10.5, 0);
+        rightPillar.castShadow = true;
+        archway.add(rightPillar);
+
+        // Overhead Beam crossbar across the running lanes
+        const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(50, 2.8, 4.0), metalMat);
+        crossBeam.position.set(0, 20, 0);
+        crossBeam.castShadow = true;
+        archway.add(crossBeam);
+
+        // Central visual plaque badge for start/finish line branding
+        const badgeCenter = new THREE.Mesh(new THREE.BoxGeometry(14, 4.5, 4.5), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35 }));
+        badgeCenter.position.set(0, 20.2, 0.1);
+        archway.add(badgeCenter);
+
+        // Adding glowing start neon decorations
+        const leftNeonSign = new THREE.Mesh(new THREE.BoxGeometry(16, 0.7, 4.2), neonCyanMat);
+        leftNeonSign.position.set(-11, 20, 0);
+        archway.add(leftNeonSign);
+
+        const rightNeonSign = new THREE.Mesh(new THREE.BoxGeometry(16, 0.7, 4.2), neonOrangeMat);
+        rightNeonSign.position.set(11, 20, 0);
+        archway.add(rightNeonSign);
+
+        // Let's create an elegant mini neon halo on top of the starting gate
+        const miniHaloGeo = new THREE.BoxGeometry(14, 0.4, 4.4);
+        const miniHalo = new THREE.Mesh(miniHaloGeo, neonCyanMat);
+        miniHalo.position.set(0, 22.5, 0);
+        archway.add(miniHalo);
+
+        landmarkGroup.add(archway);
+
+        // 3. A beautiful high-definition Checkerstart line across the lanes
+        const checkeredGroup = new THREE.Group();
+        checkeredGroup.position.set(150, 0.82, 0);
+        const tileGeo = new THREE.PlaneGeometry(38, 1.8);
+        const canvasTile = document.createElement('canvas');
+        canvasTile.width = 512;
+        canvasTile.height = 32;
+        const ctxTile = canvasTile.getContext('2d');
+        // Paint a sharp checkered start block pattern
+        ctxTile.fillStyle = "#ffffff";
+        ctxTile.fillRect(0, 0, 512, 32);
+        ctxTile.fillStyle = "#1e293b";
+        for (let x = 0; x < 32; x++) {
+          if (x % 2 === 0) {
+            ctxTile.fillRect(x * 16, 0, 16, 16);
+            ctxTile.fillRect((x + 1) * 16, 16, 16, 16);
+          } else {
+            ctxTile.fillRect(x * 16, 16, 16, 16);
+            ctxTile.fillRect((x - 1) * 16, 0, 16, 16);
+          }
+        }
+        const checkeredTex = new THREE.CanvasTexture(canvasTile);
+        const checkeredMat = new THREE.MeshBasicMaterial({
+          map: checkeredTex,
+          transparent: true,
+          opacity: 0.9,
+          side: THREE.DoubleSide
+        });
+        const checkeredDecal = new THREE.Mesh(tileGeo, checkeredMat);
+        checkeredDecal.rotation.x = -Math.PI / 2;
+        checkeredGroup.add(checkeredDecal);
+        
+        landmarkGroup.add(checkeredGroup);
+
+        scene.add(landmarkGroup);
+      }
+
+      function createAthleteMesh(options) {
+        const bodyGroup = new THREE.Group();
+
+        const skinMat = new THREE.MeshStandardMaterial({
+          color: options.skinColor,
+          roughness: 0.85,
+          metalness: 0.1
+        });
+
+        const jerseyMat = new THREE.MeshStandardMaterial({
+          color: options.jerseyColor,
+          roughness: 0.7,
+          metalness: 0.15
+        });
+
+        const shortsMat = new THREE.MeshStandardMaterial({
+          color: options.shortsColor,
+          roughness: 0.8,
+          metalness: 0.1
+        });
+
+        const shoeMat = new THREE.MeshStandardMaterial({
+          color: options.shoeColor,
+          roughness: 0.4,
+          metalness: 0.2
+        });
+
+        const hairMat = new THREE.MeshStandardMaterial({
+          color: options.hairColor,
+          roughness: 0.9
+        });
+
+        const isPl = !!options.isPlayer;
+
+        // 1. Torso body mesh - Styled as custom performance athletic sports jersey
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.50, 0.40, 1.7, 12), jerseyMat);
+        torso.position.y = 2.85; // elevated so legs swing exactly down to the track ground level and do not sink
+        torso.castShadow = isPl;
+        torso.receiveShadow = isPl;
+        bodyGroup.add(torso);
+
+        // Performance Sports Bib with unique runner number visually
+        const bibPlate = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.42), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }));
+        bibPlate.position.set(0, 0.1, -0.05);
+        bibPlate.castShadow = isPl;
+        torso.add(bibPlate);
+
+        const bibNumber = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 0.12), new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.9 }));
+        bibNumber.position.set(0, 0.05, -0.22);
+        bibPlate.add(bibNumber);
+
+        // 2. Head, Hair Styles, Headwear Accessories & Visors
+        const headGroup = new THREE.Group();
+        headGroup.position.set(0, 1.15, 0);
+
+        const humanHead = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), skinMat);
+        humanHead.castShadow = isPl;
+        headGroup.add(humanHead);
+
+        // Customize Hairstyle configurations procedurally
+        const hairStyle = typeof options.hairStyle === 'number' ? options.hairStyle : 0;
+        if (hairStyle === 0) {
+          // Classic Short Sports Jogger Hair
+          const hair = new THREE.Mesh(new THREE.SphereGeometry(0.39, 12, 12, 0, Math.PI * 2, 0, Math.PI / 1.8), hairMat);
+          hair.position.y = 0.08;
+          hair.rotation.x = -0.3;
+          headGroup.add(hair);
+        } else if (hairStyle === 1) {
+          // Stylish Ponytail Style
+          const hair = new THREE.Mesh(new THREE.SphereGeometry(0.39, 12, 12, 0, Math.PI * 2, 0, Math.PI / 1.8), hairMat);
+          hair.position.y = 0.08;
+          hair.rotation.x = -0.3;
+          headGroup.add(hair);
+          
+          const pony = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.03, 0.45, 8), hairMat);
+          pony.position.set(0, -0.15, -0.38);
+          pony.rotation.x = -0.5;
+          headGroup.add(pony);
+        } else if (hairStyle === 2) {
+          // Sharp Mohawk / Crest Spike
+          const hair = new THREE.Mesh(new THREE.SphereGeometry(0.385, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2.0), hairMat);
+          hair.position.y = 0.08;
+          hair.rotation.x = -0.2;
+          headGroup.add(hair);
+          
+          const mohawk = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.52), hairMat);
+          mohawk.position.set(0, 0.42, -0.06);
+          headGroup.add(mohawk);
+        } else if (hairStyle === 3) {
+          // Round fluffy Afro Cloud
+          const afro = new THREE.Mesh(new THREE.SphereGeometry(0.46, 12, 12), hairMat);
+          afro.position.set(0, 0.12, -0.06);
+          headGroup.add(afro);
+        } // Style 4 represents shaved bald look (no hair mesh is added)
+
+        // Custom Headwear Accessories
+        const headwear = typeof options.headwear === 'number' ? options.headwear : 0;
+        if (headwear === 1) {
+          // Athletic Peak Cap worn backward
+          const capMat = new THREE.MeshStandardMaterial({ color: options.shoeColor || 0xef4444, roughness: 0.75 });
+          const cap = new THREE.Mesh(new THREE.SphereGeometry(0.40, 12, 12, 0, Math.PI * 2, 0, Math.PI / 1.9), capMat);
+          cap.position.y = 0.1;
+          cap.rotation.x = -0.35;
+          headGroup.add(cap);
+          
+          const peak = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.03, 0.40), capMat);
+          peak.position.set(0, 0.12, -0.42);
+          peak.rotation.x = -0.12;
+          headGroup.add(peak);
+        } else if (headwear === 2) {
+          // Matching Neon Sweat Headband
+          const sweatMat = new THREE.MeshStandardMaterial({ color: options.jerseyColor || 0xd97706, roughness: 0.95 });
+          const headband = new THREE.Mesh(new THREE.CylinderGeometry(0.395, 0.395, 0.14, 12, 1, true), sweatMat);
+          headband.position.set(0, 0.1, 0.04);
+          headband.rotation.x = 0.12;
+          headGroup.add(headband);
+        } else if (headwear === 3) {
+          // Aerodynamic dark sunglasses/shades
+          const glassMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.05, metalness: 0.95 });
+          const visor = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.14, 0.22), glassMat);
+          visor.position.set(0, 0.06, 0.28);
+          headGroup.add(visor);
+        }
+
+        torso.add(headGroup);
+
+        // Customize Singlet/Jersey Fabric patterns
+        const singletPattern = typeof options.singletPattern === 'number' ? options.singletPattern : 0;
+        if (singletPattern === 1) {
+          // Diagonal sash band
+          const sashMat = new THREE.MeshStandardMaterial({ color: options.shoeColor || 0xef4444, roughness: 0.75 });
+          const sash = new THREE.Mesh(new THREE.BoxGeometry(0.51, 0.16, 0.42), sashMat);
+          sash.position.set(0, 0.1, 0);
+          sash.rotation.z = 0.55;
+          torso.add(sash);
+        } else if (singletPattern === 2) {
+          // Horizontal chest stripe
+          const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8 });
+          const bandLine = new THREE.Mesh(new THREE.CylinderGeometry(0.51, 0.48, 0.14, 12), stripeMat);
+          bandLine.position.y = 0.35;
+          torso.add(bandLine);
+        }
+
+        // 3. Left Arm - Skin tone with sports wristband
+        const armL = new THREE.Group();
+        armL.position.set(-0.62, 0.55, 0); // shoulder pivot socket
+
+        const upperArmL = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.75, 8), skinMat);
+        upperArmL.geometry.translate(0, -0.38, 0); // shift geometry origin down to pivot cleanly
+        upperArmL.castShadow = isPl;
+        armL.add(upperArmL);
+
+        const lowerArmL = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.10, 0.75, 8), skinMat);
+        lowerArmL.position.set(0, -0.75, 0.12);
+        lowerArmL.rotation.x = -Math.PI / 3.4; // bent running arm pose
+        lowerArmL.castShadow = isPl;
+        armL.add(lowerArmL);
+
+        // Wristband accent
+        const bandL = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.15, 8), shoeMat);
+        bandL.position.y = 0.05;
+        lowerArmL.add(bandL);
+
+        torso.add(armL);
+
+        // 4. Right Arm - Skin tone with sports wristband
+        const armR = new THREE.Group();
+        armR.position.set(0.62, 0.55, 0); // shoulder pivot socket
+
+        const upperArmR = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.75, 8), skinMat);
+        upperArmR.geometry.translate(0, -0.38, 0);
+        upperArmR.castShadow = isPl;
+        armR.add(upperArmR);
+
+        const lowerArmR = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.10, 0.75, 8), skinMat);
+        lowerArmR.position.set(0, -0.75, 0.12);
+        lowerArmR.rotation.x = -Math.PI / 3.4;
+        lowerArmR.castShadow = isPl;
+        armR.add(lowerArmR);
+
+        // Wristband accent
+        const bandR = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.15, 8), shoeMat);
+        bandR.position.y = 0.05;
+        lowerArmR.add(bandR);
+
+        torso.add(armR);
+
+        // 5. Left Leg - Upper thigh black sprinter shorts, lower thigh skin tone.
+        const legL = new THREE.Group();
+        legL.position.set(-0.28, -0.85, 0); // hip socket
+
+        const upperLegL = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.16, 0.9, 10), shortsMat);
+        upperLegL.geometry.translate(0, -0.45, 0);
+        upperLegL.castShadow = isPl;
+        legL.add(upperLegL);
+
+        const lowerLegL = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.11, 0.9, 10), skinMat);
+        lowerLegL.position.set(0, -0.9, -0.05);
+        lowerLegL.geometry.translate(0, -0.45, 0);
+        lowerLegL.castShadow = isPl;
+        legL.add(lowerLegL);
+
+        const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.16, 0.50), shoeMat);
+        shoeL.position.set(0, -1.0, -0.12);
+        lowerLegL.add(shoeL);
+
+        if (options.hasSocks) {
+          const sockMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8 }); // sleek athletic white-socks
+          const sockL = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.155, 0.40, 8), sockMat);
+          sockL.position.y = -0.45;
+          lowerLegL.add(sockL);
+        }
+
+        torso.add(legL);
+
+        // 6. Right Leg - Upper thigh sprinter shorts, lower thigh skin tone.
+        const legR = new THREE.Group();
+        legR.position.set(0.28, -0.85, 0); // hip socket
+
+        const upperLegR = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.16, 0.9, 10), shortsMat);
+        upperLegR.geometry.translate(0, -0.45, 0);
+        upperLegR.castShadow = isPl;
+        legR.add(upperLegR);
+
+        const lowerLegR = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.11, 0.9, 10), skinMat);
+        lowerLegR.position.set(0, -0.9, -0.05);
+        lowerLegR.geometry.translate(0, -0.45, 0);
+        lowerLegR.castShadow = isPl;
+        legR.add(lowerLegR);
+
+        const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.16, 0.50), shoeMat);
+        shoeR.position.set(0, -1.0, -0.12);
+        lowerLegR.add(shoeR);
+
+        if (options.hasSocks) {
+          const sockMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8 });
+          const sockR = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.155, 0.40, 8), sockMat);
+          sockR.position.y = -0.45;
+          lowerLegR.add(sockR);
+        }
+
+        torso.add(legR);
+
+        bodyGroup.userData = {
+          torso: torso,
+          head: headGroup,
+          armL: armL,
+          armR: armR,
+          legL: legL,
+          legR: legR,
+          lowerLegL: lowerLegL,
+          lowerLegR: lowerLegR,
+          shoeL: shoeL,
+          shoeR: shoeR,
+          skinMat: skinMat,
+          jerseyMat: jerseyMat,
+          shortsMat: shortsMat
+        };
+
+        return bodyGroup;
+      }
+
+      function createPlayerCapsule() {
+        // Player parent group controls track navigation orientation (Yaw & Position translation)
+        playerGroup = new THREE.Group();
+        playerGroup.position.set(trackRadius, 0.80, 0); // Position at ground track level (0.80 asphalt height)
+        
+        // Root container for character animations
+        player = createAthleteMesh({
+          skinColor: 0xfdba74, // Peach athletic skin hue
+          jerseyColor: 0xd97706, // Amber performance sports jersey
+          shortsColor: 0x1e293b, // Slim black sprinter shorts
+          shoeColor: 0xef4444, // Vibrant aerodynamic red running shoes
+          hairColor: 0x27272a, // dark hair style
+          isPlayer: true
+        });
+        player.name = "runner";
+
+        // Assign refs for realtime player collision damage color flashes
+        playerSkinMat = player.userData.skinMat;
+        playerJerseyMat = player.userData.jerseyMat;
+        playerShortsMat = player.userData.shortsMat;
+
+        // Futuristic vector propulsion energy trail under-shadow ring
+        const shadowGeo = new THREE.RingGeometry(1.0, 1.2, 32);
+        const shadowMat = new THREE.MeshBasicMaterial({
+          color: 0xd97706, // Amber shadow reflection glow
+          transparent: true,
+          opacity: 0.30,
+          side: THREE.DoubleSide
+        });
+        const shadowRing = new THREE.Mesh(shadowGeo, shadowMat);
+        shadowRing.rotation.x = Math.PI / 2;
+        shadowRing.position.y = 0.05;
+        player.add(shadowRing);
+
+        // Dynamic light casting amber tone onto stadium racetrack path
+        const underlight = new THREE.PointLight(0xf59e0b, 2.5, 12);
+        underlight.position.set(0, 0.8, 0);
+        underlight.name = "underglow";
+        player.add(underlight);
+
+        playerGroup.add(player);
+        scene.add(playerGroup);
+      }
+
+      function createOpponentRunners() {
+        // Clear out existing runners safely to avoid memory leaks or duplicate rendering
+        if (aiRunners && aiRunners.length > 0) {
+          aiRunners.forEach((runner) => {
+            scene.remove(runner);
+          });
+        }
+        aiRunners = [];
+
+        // Dynamic density: Spawn 72 runners of high graphic definition to fill the track completely
+        const numRunners = 72;
+        
+        // Professional track & field competitive colors
+        const jerseyColors = [
+          0x3b82f6, // Performance Blue
+          0x10b981, // Emerald Green
+          0xeab308, // Volt Yellow
+          0x8b5cf6, // Track Purple
+          0xec4899, // Sprinter Pink
+          0x06b6d4, // Neon Cyan
+          0x84cc16, // Lime Yellow
+          0xf97316, // Sunset Orange
+          0xffffff, // Alpine White
+          0x1e293b  // Phantom Slate
+        ];
+
+        const skinColors = [
+          0xfdba74, // Peach
+          0xdf9b56, // Golden Brown
+          0x8c5a2b, // Cocoa Dark
+          0xdca37f, // Warm Tan
+          0x5c4033, // Espresso Rich
+          0xe6c29e  // Honey Light
+        ];
+
+        const hairColors = [
+          0x18181b, // Jet Black
+          0x513526, // Warm Brown
+          0xa14524, // Auburn Red
+          0xebd491, // Sprinter Blonde
+          0xa1a1aa, // Aerodynamic Gray
+          0xe4e4e7  // Frost White
+        ];
+
+        const shortsColors = [
+          0x1e293b, 0x1e1b4b, 0xf8fafc, 0xf1f5f9
+        ];
+
+        for (let i = 0; i < numRunners; i++) {
+          // Distribute runners around the path but skip the starting block (0.45 threshold safety gap)
+          const angle = 0.45 + Math.random() * (Math.PI * 2 - 0.9);
+          // Scatter wide across tarmac parameters (trackRadius +/- 14)
+          const baseRadius = trackRadius + (Math.random() * 28 - 14);
+
+          // Random aesthetic preferences
+          const skinColor = skinColors[i % skinColors.length];
+          const jerseyColor = jerseyColors[i % jerseyColors.length];
+          const hairColor = hairColors[i % hairColors.length];
+          const shortsColor = shortsColors[i % shortsColors.length];
+          const shoeColor = jerseyColors[(i + 3) % jerseyColors.length];
+
+          // Distribute varied styling attributes for perfect visual variety!
+          const hairStyle = i % 5;          // 0: Short, 1: Ponytail, 2: Mohawk, 3: Afro, 4: Shaved Bald
+          const headwear = (i * 2 + 1) % 4; // 0: None, 1: Backwards Cap, 2: Sweat Headband, 3: Sport Shades
+          const singletPattern = i % 3;     // 0: Solid Singlet, 1: Sash, 2: Stripes
+          const hasSocks = (i % 2 === 0);   // 50% chance of sporty athletic high-rise socks
+
+          // Instantiate full physical athlete shape matching player skeleton
+          const runner = createAthleteMesh({
+            skinColor: skinColor,
+            jerseyColor: jerseyColor,
+            shortsColor: shortsColor,
+            shoeColor: shoeColor,
+            hairColor: hairColor,
+            hairStyle: hairStyle,
+            headwear: headwear,
+            singletPattern: singletPattern,
+            hasSocks: hasSocks,
+            isPlayer: false
+          });
+          runner.name = "aiRunner_" + i;
+
+          // Introduce human scale differences perfectly
+          const heightScale = 0.85 + Math.random() * 0.22;
+          runner.scale.set(heightScale, heightScale, heightScale);
+
+          // Variable running velocities and weaving characteristics
+          const baseSpeed = 0.035 + Math.random() * 0.045; 
+          const weaveFreq = 0.35 + Math.random() * 0.75;
+          const weaveAmp = 1.2 + Math.random() * 3.5;
+
+          runner.userData.angle = angle;
+          runner.userData.radius = baseRadius;
+          runner.userData.baseRadius = baseRadius;
+          runner.userData.speed = baseSpeed;
+          runner.userData.weaveFreq = weaveFreq;
+          runner.userData.weaveAmp = weaveAmp;
+          runner.userData.animOffset = Math.random() * 100;
+          runner.userData.heightScale = heightScale;
+
+          const rx = Math.cos(angle) * baseRadius;
+          const rz = Math.sin(angle) * baseRadius;
+          runner.position.set(rx, 0.80, rz);
+
+          aiRunners.push(runner);
+          scene.add(runner);
+        }
+      }
+
+      function createSpeedBoostPads() {
+        // Boost pads removed per user request
+      }
+
+      function createAtmosphericDust() {
+        // floating light particles reflecting running speeds
+        const starQty = 600;
+        const geo = new THREE.BufferGeometry();
+        const positions = new Float32Array(starQty * 3);
+        const colors = new Float32Array(starQty * 3);
+
+        for (let i = 0; i < starQty; i++) {
+          // Put them in a ring hovering cloud above the track area
+          const angle = Math.random() * Math.PI * 2;
+          const offsetR = trackRadius + (Math.random() * 60 - 30);
+          const px = Math.cos(angle) * offsetR;
+          const pz = Math.sin(angle) * offsetR;
+          const py = Math.random() * 45 - 5; // spread from track level up into air
+
+          positions[i*3] = px;
+          positions[i*3+1] = py;
+          positions[i*3+2] = pz;
+
+          // Glowing light blue colors
+          colors[i*3] = 0.4;
+          colors[i*3+1] = 0.9;
+          colors[i*3+2] = 1.0;
+        }
+
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        // Use standard round texture or particle dot
+        const mat = new THREE.PointsMaterial({
+          size: 1.4,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.8,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+
+        dustParticles = new THREE.Points(geo, mat);
+        scene.add(dustParticles);
+      }
+
+      let lastStrideCrossing = 0;
+
+      function animateAthleteGait(runner, speedVal, runTime, dt) {
+        if (!runner || !runner.userData || !runner.userData.torso) return;
+
+        // Ensure phase exists on runner for coherent dynamic frequency integration (prevents leg flutters and clunky transitions!)
+        if (typeof runner.userData.animPhase !== 'number') {
+          runner.userData.animPhase = Math.random() * 10;
+        }
+        // Smoothly scaled dynamic stride frequency so running leg animation is natural, elegant, and not too rapid
+        const runCycleSpeed = 2.1 + (speedVal / 0.16) * 5.2;
+        // Integrate frequency over delta time rather than multiplying absolute time (which causes phase leaps)
+        runner.userData.animPhase += dt * runCycleSpeed;
+        const cycle = runner.userData.animPhase;
+
+        // Scale limb amplitude based on velocity, so limbs remain centered when stationary
+        const motionScale = Math.min(1.0, speedVal * 12.0);
+        const ud = runner.userData;
+
+        // 1. Symmetrical Leg Swing (opposing sine waves)
+        const angleL = Math.sin(cycle) * 0.75 * motionScale;
+        const angleR = -Math.sin(cycle) * 0.75 * motionScale;
+
+        ud.legL.rotation.x = angleL;
+        ud.legR.rotation.x = angleR;
+
+        // Knee bends: when a thigh sweeps back (negative angle), bend the knee upward
+        ud.lowerLegL.rotation.x = (Math.max(0, -Math.sin(cycle)) * 0.85) * motionScale;
+        ud.lowerLegR.rotation.x = (Math.max(0, Math.sin(cycle)) * 0.85) * motionScale;
+
+        // 2. Arms pumping (swings alternate to leg swings)
+        ud.armL.rotation.x = -angleL * 0.9;
+        ud.armR.rotation.x = -angleR * 0.9;
+
+        // Dynamic shoulder sway and outward frame
+        ud.armL.rotation.z = (-0.12 + Math.sin(cycle * 2.0) * 0.04) * motionScale;
+        ud.armR.rotation.z = (0.12 - Math.sin(cycle * 2.0) * 0.04) * motionScale;
+
+        // 3. Torso bobbing and acceleration lean
+        const defaultTorsoY = 2.85;
+        const bob = Math.abs(Math.sin(cycle)) * 0.16 * motionScale;
+        ud.torso.position.y = defaultTorsoY + bob;
+
+        // Athlete leans forward more aggressively at high velocities
+        const forwardLean = 0.08 + (speedVal / 0.16) * 0.22; 
+        ud.torso.rotation.x = forwardLean;
+
+        // 4. Head stabilization posture adjustment
+        ud.head.rotation.x = -forwardLean * 0.6 + Math.sin(cycle * 2.0) * 0.04 * motionScale;
+      }
+
+      // GAME ENGINE LOOP TRIGGERS
+
+      function resetGameValues() {
+        // Pitch values
+        speed = 0;
+        playerAngle = 0;
+        playerRadius = trackRadius;
+        targetShield = 100;
+        curShield = 100;
+        score = 0;
+        peakSpeed = 0;
+        boosterTime = 0;
+        sprintEnergy = 100; // Reset athlete sprint fuel
+        isSprinting = false;
+        isExhausted = false;
+        currentLap = 1;
+        scoreIncrementCounter = 0;
+        lapTime = 0;
+        gameTimer = 0;
+
+        hudLap.textContent = currentLap;
+        hudTimer.textContent = "00:00.00";
+        if (bestLapTime === null) {
+          hudBestLap.textContent = "--:--.--";
+        }
+        hudPrevLap.textContent = "--:--.--";
+        hudScore.textContent = "0";
+
+        // Reset positions
+        playerGroup.position.set(trackRadius, 0.80, 0);
+        playerGroup.rotation.set(0, 0, 0);
+        player.position.set(0, 0, 0);
+        player.rotation.set(0, 0, 0);
+
+        // Repopulate active dynamic opponent runners on track
+        createOpponentRunners();
+        hitFlashTime = 0;
+
+        gameOverScreen.classList.add('hidden');
+        hud.classList.remove('hidden');
+        alertBanner.classList.add('opacity-0');
+        
+        // Start live synthetic morning run tracker tracks
+        stopAwesomeMusic();
+        startAwesomeMusic();
+
+        let initialTimeMsg = clock.getDelta(); // Clear delta stopwatch clocks
+        gameActive = true;
+      }
+
+      function endRunSession(isVictory = false) {
+        gameActive = false;
+        stopAwesomeMusic();
+
+        // Feed metrics to scoreboard end screen
+        goScore.forEach(el => el.textContent = Math.round(score));
+        let convertKmH = Math.round(peakSpeed * 150); // proportional realistic human jog metric
+        goSpeed.forEach(el => el.textContent = convertKmH + " KM/H");
+        
+        const displayLapsNum = isVictory ? 5 : (currentLap - 1);
+        goLaps.forEach(el => el.textContent = displayLapsNum + " LAPS");
+
+        // Record screen updates
+        if (bestLapTime !== null) {
+          goNewBest.classList.remove('hidden');
+        } else {
+          goNewBest.classList.add('hidden');
+        }
+
+        const goIcon = document.getElementById('go-icon');
+        const goTitle = document.getElementById('go-title');
+        const goSubtitle = document.getElementById('go-subtitle');
+        const goIconContainer = document.getElementById('go-icon-container');
+
+        if (isVictory) {
+          playSpectacularVictoryFanfare();
+          if (goIcon) goIcon.textContent = "🏆";
+          if (goTitle) goTitle.textContent = "CHAMPION VICTORY!";
+          if (goSubtitle) goSubtitle.textContent = "SPECTACULAR 5-LAP RUN COMPLETED";
+          
+          if (goIconContainer) {
+            goIconContainer.classList.remove('bg-red-950/50', 'border-red-500/40', 'text-red-500');
+            goIconContainer.classList.add('bg-amber-950/50', 'border-amber-500/40', 'text-amber-400');
+          }
+          if (gameOverScreen) {
+            gameOverScreen.classList.remove('bg-slate-950/95');
+            gameOverScreen.classList.add('bg-[#0f172a]/98'); // elegant sapphire slate victory backdrop
+          }
+        } else {
+          playSynthesizedCrashSound();
+          if (goIcon) goIcon.textContent = "👟";
+          if (goTitle) goTitle.textContent = "FATIGUE LIMIT REACHED";
+          if (goSubtitle) goSubtitle.textContent = "STADIUM JOG COMPLETED";
+          
+          if (goIconContainer) {
+            goIconContainer.classList.remove('bg-amber-950/50', 'border-amber-500/40', 'text-amber-400');
+            goIconContainer.classList.add('bg-red-950/50', 'border-red-500/40', 'text-red-500');
+          }
+          if (gameOverScreen) {
+            gameOverScreen.classList.remove('bg-[#0f172a]/98');
+            gameOverScreen.classList.add('bg-slate-950/95');
+          }
+        }
+
+        hud.classList.add('hidden');
+        gameOverScreen.classList.remove('hidden');
+      }
+
+      // CORE RUNNING PHYSICS PROCESSORS (Updates every frame)
+
+      function processGamePhysics(dt) {
+        if (!gameActive) return;
+
+        // Player Hit Flash logic to denote collision damage/impact briefly
+        if (hitFlashTime > 0) {
+          hitFlashTime -= dt;
+          if (playerSkinMat) playerSkinMat.color.setHex(0xef4444);
+          if (playerJerseyMat) playerJerseyMat.color.setHex(0xef4444);
+          if (playerShortsMat) playerShortsMat.color.setHex(0x991b1b);
+        } else {
+          // Restore beautiful original athletic wear colors
+          if (playerSkinMat) playerSkinMat.color.setHex(0xfdba74);
+          if (playerJerseyMat) playerJerseyMat.color.setHex(0xd97706);
+          if (playerShortsMat) playerShortsMat.color.setHex(0x1e293b);
+        }
+
+        gameTimer += dt;
+        lapTime += dt;
+
+        // Display running clock times beautifully formatted
+        const formatClockTime = (secs) => {
+          const m = Math.floor(secs / 60);
+          const s = Math.floor(secs % 60);
+          const ms = Math.floor((secs % 1) * 100);
+          return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        };
+        hudTimer.textContent = formatClockTime(lapTime);
+
+        // Core score tracking proportional to progress speed
+        if (speed > 0.01) {
+          scoreIncrementCounter += speed * dt * 380;
+          if (scoreIncrementCounter >= 1) {
+            score += Math.floor(scoreIncrementCounter);
+            scoreIncrementCounter %= 1;
+            hudScore.textContent = Math.round(score);
+          }
+        }
+
+        // ATHLETE SPEED LIMITS:
+        // Slow jogging base speed: maximum 0.065
+        // Premium athletic manual sprint speed (Space or Shift or touch): max 0.135
+        const baseJogMax = 0.055;
+        const sprintSprintMax = 0.125;
+        const boosterMax = 0.20;
+
+        // Detect if active sprint mode is engaged
+        let wantsToSprint = (keys.forward || keys.boost || isSprinting);
+
+        if (isExhausted) {
+          wantsToSprint = false;
+        }
+
+        if (wantsToSprint && sprintEnergy > 0) {
+          // Drain sprint energy during exertion (4 times slower, so runner sprints longer!)
+          sprintEnergy -= dt * 6.625;
+          if (sprintEnergy <= 0) {
+            sprintEnergy = 0;
+            isExhausted = true;
+          }
+          // Accelerate slowly and naturally up to sprint speed
+          speed += baseAcceleration * 0.28 * dt * 60;
+          if (speed > sprintSprintMax) speed = sprintSprintMax;
+        } else {
+          // Re-generate active athletic sprint energy bar (2 times slower, i.e., 14.5 / 2 = 7.25)
+          sprintEnergy += dt * 7.25;
+          if (sprintEnergy > maxEnergy) sprintEnergy = maxEnergy;
+
+          // Clear exhausted state once recovered above 30%
+          if (isExhausted && sprintEnergy >= 30) {
+            isExhausted = false;
+          }
+
+          // Decay back slowly and naturally to normal jogging speed
+          if (speed > baseJogMax) {
+            speed -= baseAcceleration * 0.22 * dt * 60;
+            if (speed < baseJogMax) speed = baseJogMax;
+          } else {
+            speed += baseAcceleration * 0.25 * dt * 60;
+            speed = Math.min(speed, baseJogMax);
+          }
+        }
+
+
+
+        // Store peak speed achieved
+        if (speed > peakSpeed) {
+          peakSpeed = speed;
+        }
+
+        // SPEEDOMETER UI BAR
+        let computedKmH = Math.round(speed * 300); // 300 max factor for Human jog sports speedometer
+        hudSpeedNum.textContent = computedKmH;
+        let speedPercent = Math.min(100, Math.round((speed / sprintSprintMax) * 100));
+        hudSpeedPercent.textContent = speedPercent + "%";
+        hudSpeedBar.style.width = speedPercent + "%";
+
+        // ENERGY UI BAR WITH REALISTIC FATIGUE STYLING
+        if (isExhausted) {
+          hudEnergyPercent.textContent = "FATIGUED (" + Math.round(sprintEnergy) + "%)";
+          hudEnergyPercent.style.color = "#ef4444";
+          hudEnergyBar.style.background = "#ef4444";
+        } else {
+          hudEnergyPercent.textContent = Math.round(sprintEnergy) + "%";
+          hudEnergyPercent.style.color = "";
+          hudEnergyBar.style.background = "";
+        }
+        hudEnergyBar.style.width = sprintEnergy + "%";
+
+        // REVERSE THE RUNNING MOVEMENT DIRECTION:
+        // Originally: playerAngle += speed * dt;
+        // In reverse direction: Subtract speed * dt to run anti-clockwise (reverse path progression)
+        playerAngle -= speed * dt;
+
+        // Smoothly interpolate currentLean towards -1 (left), 1 (right) or 0 (none)
+        let targetLeanLevel = 0;
+        if (keys.left || mobileSteer === -1) {
+          targetLeanLevel = -1;
+        } else if (keys.right || mobileSteer === 1) {
+          targetLeanLevel = 1;
+        }
+        currentLean += (targetLeanLevel - currentLean) * 12.0 * dt; // fast but butter-smooth interpolation
+
+        // Map steer velocity
+        let sideTorque = targetLeanLevel * 5.5 * dt; // shift radial path outwards/inwards (much slower, realistic running lane transition)
+        playerRadius += sideTorque;
+        // Firm physical boundaries keeping racer stuck to lane parameters inside running track
+        playerRadius = Math.max(trackRadius - 18, Math.min(trackRadius + 18, playerRadius));
+
+        // Removed turn lean roll and sway per user request (keeps them completely upright/natural)
+        player.rotation.z = 0;
+        player.rotation.y = 0;
+
+        // Run full procedural dynamic humanoid locomotion!
+        animateAthleteGait(player, speed, clock.getElapsedTime(), dt);
+
+        // Procedural footstep crunches on Asphalt synchronized precisely to phase-coherent leg crossings!
+        const cycle = player.userData.animPhase || 0;
+        let strideCrossing = Math.sin(cycle);
+        if ((lastStrideCrossing >= 0 && strideCrossing < 0) || (lastStrideCrossing <= 0 && strideCrossing > 0)) {
+          if (speed > 0.02) {
+            playProceduralFootstep(speed);
+          }
+        }
+        lastStrideCrossing = strideCrossing;
+
+        // Map absolute group positions aligned to concentric center track coordinates
+        let currentX = Math.cos(playerAngle) * playerRadius;
+        let currentZ = Math.sin(playerAngle) * playerRadius;
+
+        playerGroup.position.set(currentX, 0.80, currentZ);
+
+        // Smooth yaw tracking setup (athlete faces along reverse track curve tangent)
+        // Since movement is reversed, we subtract lookOffset to face ahead onto the path!
+        const forwardLookOffset = 0.05; 
+        let nextAngle = playerAngle - forwardLookOffset;
+        let lookX = Math.cos(nextAngle) * playerRadius;
+        let lookZ = Math.sin(nextAngle) * playerRadius;
+
+        playerGroup.lookAt(new THREE.Vector3(lookX, 0.80, lookZ));
+
+        // REAL-TIME COLLISION ENGINE TRIPPERS
+
+        // 1. Athlete Runway Collisions (Bumping into other Runners)
+        aiRunners.forEach((runner) => {
+          // Bounding box distance-to-runner check (reduced to 1.2 for tighter, highly realistic competitive racing space!)
+          const distance = playerGroup.position.distanceTo(runner.position);
+          if (distance < 1.2) {
+            // Trigger crash stumble crunch sound
+            playSynthesizedCrashSound();
+            
+            // Speed penalty: Reduce speed instantly
+            speed = 0.025;
+            
+            // Push player back slightly (Since progression angle goes negative, adding to angle moves them back!)
+            playerAngle += 0.065;
+            
+            // Reduce athletic performance stamina/health bar
+            targetShield -= 20;
+
+            // Trigger the player model color flash red timer (0.6 seconds duration)
+            hitFlashTime = 0.6;
+            
+            // Visual impact effects: screen-shake and text warnings
+            triggerCameraImpactWarp();
+            triggerAlertPrompt("COLLISION! BUMPED BY OPPONENT RUNNER", 1.8);
+          }
+        });
+
+
+
+        // LAP COUNT COMPUTATION
+        // Since player angle accumulates negatively (running reversed), use Math.abs:
+        const currentProgressLap = Math.floor(Math.abs(playerAngle) / (Math.PI * 2)) + 1;
+        if (currentProgressLap > currentLap) {
+          // Check if player reached lap 5 completion (which pushes them to Lap 6)
+          if (currentProgressLap === 6) {
+            // Victory! Player has successfully navigated all 5 laps!
+            currentLap = 6;
+            hudLap.textContent = "5";
+            
+            // Played in setTimeout triggered victory hook
+            triggerLapCompletionToast(lapTime);
+            
+            // Cease simulation and launch celebratory victory graphics/audio 
+            setTimeout(() => {
+              endRunSession(true);
+            }, 1000); // 1.0 second delay to experience the last lap completion banner first
+          } else {
+            // New intermediate lap attained!
+            currentLap = currentProgressLap;
+            hudLap.textContent = currentLap;
+            
+            // Play cheerful celebratory lap passing sound
+            playLapCompletionCelebration();
+            
+            // Toast Lap Flash Banner Screen
+            triggerLapCompletionToast(lapTime);
+          }
+          
+          lapTime = 0; // reset active countdown stopwatch
+        }
+
+        // SMOOTH INTERGITY SHIELD HUD DAMPENER
+        curShield += (targetShield - curShield) * 0.08;
+        hudShieldPercent.textContent = Math.max(0, Math.round(curShield)) + "%";
+        hudShieldBar.style.width = Math.max(0, Math.round(curShield)) + "%";
+
+        if (curShield < 30) {
+          hudShieldBar.classList.add('from-red-500', 'to-rose-600');
+          hudShieldWarning.style.opacity = '1';
+          triggerAlertPrompt("⚠️ PERFORMANCE HEALTH CRITICAL ⚠️", 0.5);
+          
+          // Sound alarm warning ticker beep every ~1s
+          if (Math.round(clock.getElapsedTime()) % 2 === 0 && Math.random() < 0.02) {
+            playMutedBeepFeedback();
+          }
+        } else {
+          hudShieldBar.classList.remove('from-red-500', 'to-rose-600');
+          hudShieldWarning.style.opacity = '0';
+        }
+
+        if (curShield <= 0) {
+          curShield = 0;
+          endRunSession(false); // Game Over Sequence due to stamina exhaustion
+        }
+      }
+
+      // HUD VISUAL NOTIFIERS
+
+      function triggerAlertPrompt(msg, decaySec) {
+        alertVal.textContent = msg;
+        alertBanner.classList.remove('opacity-0');
+        // Clear active timer handles
+        if (window.alertTimer) clearTimeout(window.alertTimer);
+        window.alertTimer = setTimeout(() => {
+          alertBanner.classList.add('opacity-0');
+        }, decaySec * 1000);
+      }
+
+      function triggerLapCompletionToast(concludedLapTime) {
+        // Toggle record-busting state evaluation
+        let isNewRecord = false;
+        if (bestLapTime === null || concludedLapTime < bestLapTime) {
+          bestLapTime = concludedLapTime;
+          isNewRecord = true;
+          
+          const formatClockTime = (secs) => {
+            const m = Math.floor(secs / 60);
+            const rS = Math.floor(secs % 60);
+            const rMs = Math.floor((secs % 1) * 100);
+            return `${m.toString().padStart(2, '0')}:${rS.toString().padStart(2, '0')}.${rMs.toString().padStart(2, '0')}`;
+          };
+          hudBestLap.textContent = formatClockTime(bestLapTime);
+        }
+
+        const formatClockTimeSimple = (secs) => {
+          const m = Math.floor(secs / 60);
+          const rS = Math.floor(secs % 60);
+          return `${m.toString().padStart(2, '0')}:${rS.toString().padStart(2, '0')}`;
+        };
+        hudPrevLap.textContent = formatClockTimeSimple(concludedLapTime);
+
+        // Flash screen HUD Toast UI
+        flashBanner.innerHTML = `<div class="bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-xs font-black uppercase font-orbitron tracking-widest px-5 py-2 rounded-xl border border-teal-400 shadow-[0_0_20px_rgba(20,184,166,0.6)]">Lap ${currentLap - 1} Complete! - ${formatClockTimeSimple(concludedLapTime)}</div>`;
+        flashBanner.style.opacity = "1";
+        flashBanner.style.transform = "translateY(0) scale(1)";
+
+        if (isNewRecord) {
+          lapStatusPulse.style.opacity = "1";
+        }
+
+        setTimeout(() => {
+          flashBanner.style.opacity = "0";
+          flashBanner.style.transform = "translateY(-10px) scale(0.95)";
+          lapStatusPulse.style.opacity = "0";
+        }, 3200);
+      }
+
+      // FX CAMERA IMPACT EFFECTS
+      let cameraImpactShiftDistance = 0;
+      function triggerCameraImpactWarp() {
+        cameraImpactShiftDistance = 1.45; // pixels offset shake anchor
+      }
+
+      function triggerThrusterFlashVFX() {
+        // Boost FOV surge!
+        camera.fov = 92;
+        camera.updateProjectionMatrix();
+      }
+
+      // THIRD-PERSON DYNAMIC CHASE CAMERA SYSTEM (Smooth Camera Follow)
+      function updateChaseCamera(dt) {
+        if (!playerGroup) return;
+
+        // Position chase camera closer behind player relative to current path angle (tangent look directions)
+        const cameraTrailAngleOffset = 0.052; // Much tighter angle trailing right behind player shoulders!
+        const trailAngle = playerAngle + cameraTrailAngleOffset;
+        
+        // Exact track center line matching
+        const trailRadius = playerRadius; 
+
+        // Target offset mapping behind the runner
+        let targetCamX = Math.cos(trailAngle) * trailRadius;
+        let targetCamZ = Math.sin(trailAngle) * trailRadius;
+        let targetCamY = 4.65; // Slightly higher POV trailing camera height as requested!
+
+        // Zoom slightly in for full graphical immersion (base FOV of 55 instead of 64)
+        let desiredFov = 55 + (speed / 0.65) * 15; 
+        // Damp camera fov back to cruising norms
+        camera.fov += (desiredFov - camera.fov) * 0.08;
+        camera.updateProjectionMatrix();
+
+        // High frequency camera collision vibrations (shake)
+        let shakeX = 0, shakeY = 0, shakeZ = 0;
+        if (cameraImpactShiftDistance > 0.01) {
+          shakeX = (Math.random() - 0.5) * cameraImpactShiftDistance;
+          shakeY = (Math.random() - 0.5) * cameraImpactShiftDistance;
+          shakeZ = (Math.random() - 0.5) * cameraImpactShiftDistance;
+          cameraImpactShiftDistance *= 0.90; // Decay shake factor
+        }
+
+        // Apply smooth lerping transformations of chase camera coordinate targets
+        const followSpeedRatio = 0.08; 
+        camera.position.x += (targetCamX + shakeX - camera.position.x) * followSpeedRatio;
+        camera.position.z += (targetCamZ + shakeZ - camera.position.z) * followSpeedRatio;
+        camera.position.y += (targetCamY + shakeY - camera.position.y) * followSpeedRatio;
+
+        // Target point: Focus slightly in-front of the runner capsule along the tangent path 
+        const lookAheadAngleOffset = 0.05; // Tightened look forward distance for close action
+        const headAngle = playerAngle - lookAheadAngleOffset;
+        let lookTargetX = Math.cos(headAngle) * playerRadius;
+        let lookTargetZ = Math.sin(headAngle) * playerRadius;
+        let lookTargetY = 2.35; // Adjusted height target to match the elevated torso smoothly
+
+        camera.lookAt(new THREE.Vector3(lookTargetX, lookTargetY, lookTargetZ));
+      }
+
+      // ANIMATE PROCEDURAL WORLD ENVIRONMENT (Central Stadium lights, Obstacles)
+
+      function animateEnvironment(dt) {
+        const elapsed = clock.getElapsedTime();
+
+        // 1. Slow rotation of glowing stadium core structure
+        if (stadiumCore) {
+          stadiumCore.rotation.y = elapsed * 0.025;
+        }
+
+        // 2. Volumetric beacon sweeps (Searchlights scanning)
+        searchlights.forEach((beam, idx) => {
+          // Slow geometric pivot swings
+          beam.rotation.x = Math.sin(elapsed * 0.4 + idx) * 0.2;
+          beam.rotation.z = Math.cos(elapsed * 0.35 + idx) * 0.2;
+        });
+
+        // 3. Dynamic AI Runner Simulation (Autonomous Movement & Weaving)
+        aiRunners.forEach((runner) => {
+          const meta = runner.userData;
+
+          // Run them forward (running in the same counter-clockwise direction as player)
+          meta.angle -= meta.speed * dt;
+
+          // Weave left and right across the track width
+          meta.radius = meta.baseRadius + Math.sin(elapsed * meta.weaveFreq + meta.animOffset) * meta.weaveAmp;
+          // Keep opponent on track tarmac limits
+          meta.radius = Math.max(trackRadius - 15, Math.min(trackRadius + 15, meta.radius));
+
+          // Set 3D position
+          const rx = Math.cos(meta.angle) * meta.radius;
+          const rz = Math.sin(meta.angle) * meta.radius;
+          runner.position.set(rx, 0.80, rz);
+
+          // Animate the fully compliant 3D skeleton joints with individual speed factor
+          animateAthleteGait(runner, meta.speed * 2.8, elapsed + meta.animOffset, dt);
+
+          // Calculate dynamic stride crossings to trigger individual distance-scaled footstep sounds
+          // Synchronized exactly to our phase-coherent joint cycles!
+          const aiCycle = runner.userData.animPhase || 0;
+          let aiStrideCrossing = Math.sin(aiCycle);
+          if (typeof meta.lastCrossing === 'undefined') {
+            meta.lastCrossing = 0;
+          }
+          if ((meta.lastCrossing >= 0 && aiStrideCrossing < 0) || (meta.lastCrossing <= 0 && aiStrideCrossing > 0)) {
+            if (playerGroup) {
+              const dx = rx - playerGroup.position.x;
+              const dz = rz - playerGroup.position.z;
+              const dist = Math.sqrt(dx * dx + dz * dz);
+              if (dist < 80.0) { // Hearing footprint zone
+                const volScale = Math.max(0.0, 1.0 - (dist / 80.0)); // Spatial falloff
+                playProceduralFootstep(meta.speed * 2.8, true, volScale);
+              }
+            }
+          }
+          meta.lastCrossing = aiStrideCrossing;
+
+          // Removed turning torso sway per user request (keeps them completely stable and upright)
+          if (runner.userData.torso) {
+            runner.userData.torso.rotation.z = 0;
+          }
+
+          // Orient opponent face forward smoothly along track curve
+          const lookOffset = 0.05;
+          const nextAngle = meta.angle - lookOffset;
+          const lookX = Math.cos(nextAngle) * meta.radius;
+          const lookZ = Math.sin(nextAngle) * meta.radius;
+          runner.lookAt(new THREE.Vector3(lookX, 0.80, lookZ));
+        });
+
+        // 4. Resolve exact physical collisions & overlaps among independent AI runners
+        for (let i = 0; i < aiRunners.length; i++) {
+          const runnerA = aiRunners[i];
+          const posA = runnerA.position;
+          const metaA = runnerA.userData;
+          
+          for (let j = i + 1; j < aiRunners.length; j++) {
+            const runnerB = aiRunners[j];
+            const posB = runnerB.position;
+            const metaB = runnerB.userData;
+            
+            // Measure 2D Euclidean distance on the ground track plane
+            const dx = posA.x - posB.x;
+            const dz = posA.z - posB.z;
+            const distSq = dx * dx + dz * dz;
+            const minDist = 1.15; // Realistic safe distance to prevent clipping/overlapping completely
+            const minDistSq = minDist * minDist;
+            
+            if (distSq < minDistSq) {
+              const dist = Math.sqrt(distSq);
+              const overlap = minDist - dist;
+              
+              let pushX = 0;
+              let pushZ = 0;
+              if (dist > 0.001) {
+                pushX = (dx / dist) * overlap * 0.5;
+                pushZ = (dz / dist) * overlap * 0.5;
+              } else {
+                // Completely overlaying, push in subtle random direction
+                const randAngle = Math.random() * Math.PI * 2;
+                pushX = Math.cos(randAngle) * overlap * 0.5;
+                pushZ = Math.sin(randAngle) * overlap * 0.5;
+              }
+              
+              posA.x += pushX;
+              posA.z += pushZ;
+              posB.x -= pushX;
+              posB.z -= pushZ;
+              
+              // Map updated coordinates back to polar parameters to preserve track orientation seamlessly
+              const angleA = Math.atan2(posA.z, posA.x);
+              let radiusA = Math.sqrt(posA.x * posA.x + posA.z * posA.z);
+              radiusA = Math.max(trackRadius - 15, Math.min(trackRadius + 15, radiusA));
+              metaA.angle = angleA;
+              metaA.radius = radiusA;
+              posA.x = Math.cos(angleA) * radiusA;
+              posA.z = Math.sin(angleA) * radiusA;
+              
+              const angleB = Math.atan2(posB.z, posB.x);
+              let radiusB = Math.sqrt(posB.x * posB.x + posB.z * posB.z);
+              radiusB = Math.max(trackRadius - 15, Math.min(trackRadius + 15, radiusB));
+              metaB.angle = angleB;
+              metaB.radius = radiusB;
+              posB.x = Math.cos(angleB) * radiusB;
+              posB.z = Math.sin(angleB) * radiusB;
+            }
+          }
+        }
+      }
+
+      // SYSTEM EVENT HANDLERS (Keyboard, Mobile Touch Actions)
+
+      function setupInputHandlers() {
+        // Desktop keyboard key binders
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+          if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+          if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.forward = true;
+          if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.backward = true;
+          if (e.key === 'Shift' || e.key === ' ' || e.key === 'Spacebar') keys.boost = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+          if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+          if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+          if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.forward = false;
+          if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.backward = false;
+          if (e.key === 'Shift' || e.key === ' ' || e.key === 'Spacebar') keys.boost = false;
+        });
+
+        // Sprint button interactive handler in HUD
+        const sprintBtn = document.getElementById('sprint-btn');
+        if (sprintBtn) {
+          sprintBtn.addEventListener('mousedown', () => { isSprinting = true; });
+          sprintBtn.addEventListener('mouseup', () => { isSprinting = false; });
+          sprintBtn.addEventListener('mouseleave', () => { isSprinting = false; });
+          sprintBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isSprinting = true;
+          }, { passive: false });
+          sprintBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isSprinting = false;
+          }, { passive: false });
+        }
+
+        // Mobile touch dynamic controllers split-screen zones config
+        window.addEventListener('touchstart', (e) => {
+          if (!gameActive) return;
+          // Avoid steering overrides if touch hits the HUD sprint button
+          if (e.target && (e.target.id === 'sprint-btn' || e.target.closest('#sprint-btn'))) {
+            return;
+          }
+          const touchX = e.touches[0].clientX;
+          const screenHalf = window.innerWidth / 2;
+
+          if (touchX < screenHalf) {
+            mobileSteer = -1; // steer left touch registered
+          } else {
+            mobileSteer = 1; // steer right touch registered
+          }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+          if (!gameActive) return;
+          if (e.target && (e.target.id === 'sprint-btn' || e.target.closest('#sprint-btn'))) {
+            return;
+          }
+          const touchX = e.touches[0].clientX;
+          const screenHalf = window.innerWidth / 2;
+
+          if (touchX < screenHalf) {
+            mobileSteer = -1;
+          } else {
+            mobileSteer = 1;
+          }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+          mobileSteer = 0; // stop steer
+        });
+
+        // Mute / sound toggle controller setup
+        muteBtn.addEventListener('click', () => {
+          mainAudioMuted = !mainAudioMuted;
+          if (mainAudioMuted) {
+            muteIcon.textContent = "🔇";
+            muteLabel.textContent = "SOUND OFF";
+            if (masterGainNode) {
+              masterGainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            }
+          } else {
+            muteIcon.textContent = "🔊";
+            muteLabel.textContent = "SOUND ON";
+            if (!audioCtx) {
+              initAudio();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+              audioCtx.resume();
+            }
+            if (masterGainNode) {
+              masterGainNode.gain.setValueAtTime(masterVolume, audioCtx.currentTime);
+            }
+          }
+        });
+
+        const volumeSlider = document.getElementById('volume-slider');
+        if (volumeSlider) {
+          volumeSlider.addEventListener('input', (e) => {
+            masterVolume = parseFloat(e.target.value);
+            if (!audioCtx) {
+              initAudio();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+              audioCtx.resume();
+            }
+            if (masterGainNode) {
+              masterGainNode.gain.setValueAtTime(masterVolume, audioCtx.currentTime);
+            }
+            
+            // Auto sync toggle state based on volume selection
+            if (masterVolume > 0 && mainAudioMuted) {
+              mainAudioMuted = false;
+              muteIcon.textContent = "🔊";
+              muteLabel.textContent = "SOUND ON";
+            } else if (masterVolume === 0 && !mainAudioMuted) {
+              mainAudioMuted = true;
+              muteIcon.textContent = "🔇";
+              muteLabel.textContent = "SOUND OFF";
+            }
+          });
+        }
+
+        // Handle browser window resize dynamically to correct aspect ratios
+        window.addEventListener('resize', () => {
+          if (camera && renderer) {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+          }
+        });
+      }
+
+      // MAIN RENDER TICK CONTROLLER (60FPS Game Loop)
+
+      function renderTick() {
+        requestAnimationFrame(renderTick);
+
+        const dt = clock.getDelta();
+        // Limit delta times on frame drops to maintain solid collision math
+        const cappedDt = Math.min(0.04, dt); 
+
+        // Update physics and core visual parameters
+        processGamePhysics(cappedDt);
+        animateEnvironment(cappedDt);
+        updateChaseCamera(cappedDt);
+
+        // Render scene
+        if (renderer && scene && camera) {
+          renderer.render(scene, camera);
+        }
+      }
+
+      // INITIAL ENGINE BOOT LOADER SETUP
+
+      startBtn.addEventListener('click', () => {
+        // Boot Web Audio engine
+        initAudio();
+        
+        // Fire up graphics engine
+        init3DEngine();
+        setupInputHandlers();
+        
+        // Clear menu overlays
+        startScreen.style.opacity = "0";
+        setTimeout(() => {
+          startScreen.classList.add('hidden');
+          hud.classList.remove('hidden');
+          // Start the 60FPS tick
+          requestAnimationFrame(renderTick);
+          resetGameValues();
+        }, 500);
+      });
+
+      retryBtn.addEventListener('click', () => {
+        initAudio();
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        resetGameValues();
+      });
+
+    </script>
+  </body>
+</html>

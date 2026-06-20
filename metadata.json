@@ -1,0 +1,6 @@
+{
+  "name": "Stadium Runner",
+  "description": "An immersive 3D futuristic stadium athletic runner game inspired by the GBK Stadium core pathway. Experience fast speeds, smooth chase cameras, obstacles, and engine sound effects using Three.js.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
