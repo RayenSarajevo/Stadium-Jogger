@@ -126,39 +126,32 @@
     <div id="hud" class="hidden absolute inset-0 z-30 flex flex-col justify-between p-4 md:p-6 text-white pointer-events-none">
       
       <!-- TOP STATUS BAR: Laps, Best Times, Core HUD -->
-      <div class="flex items-start justify-between w-full">
-        <!-- Lap Counter Panel -->
-        <div class="flex flex-col bg-slate-950/70 backdrop-blur-md border border-slate-800/80 p-3 rounded-xl pointer-events-auto min-w-[140px]">
-          <span class="text-[10px] text-slate-400 font-orbitron tracking-widest uppercase">LAP POSITION</span>
-          <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="hud-lap" class="text-3xl font-black font-orbitron text-[#dda15e]">1</span>
-            <span class="text-xs text-slate-500">/ 5</span>
+      <div class="flex items-start justify-between w-full gap-3">
+        <!-- Left Panel: Live Lap Performance -->
+        <div class="flex flex-col bg-slate-950/75 backdrop-blur-md border border-slate-800/80 p-2.5 sm:p-3 rounded-xl pointer-events-auto min-w-[125px] sm:min-w-[150px] shadow-lg">
+          <span class="text-[9px] sm:text-[10px] text-[#dda15e] font-orbitron tracking-widest uppercase font-bold">LAP <span id="hud-lap">1</span> / 5</span>
+          <div class="flex items-baseline gap-1 mt-1">
+            <span id="hud-timer" class="text-base sm:text-2xl font-black font-orbitron text-slate-100 tracking-wider">00:00.00</span>
           </div>
-          <span id="lap-status-pulse" class="text-[10px] text-emerald-400 font-orbitron font-bold mt-1 tracking-wider flex items-center gap-1 opacity-0 transition-opacity duration-300">
-            <span class="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span> NEW LAP RECORD
+          <span id="lap-status-pulse" class="text-[9px] sm:text-[10px] text-emerald-400 font-orbitron font-bold mt-1 tracking-wider flex items-center gap-1 opacity-0 transition-opacity duration-300">
+            <span class="inline-block w-1 h-1 sm:w-1.5 sm:h-1.5 bg-emerald-400 rounded-full animate-ping"></span> LAP RECORD!
           </span>
         </div>
 
-        <!-- Center Stage: Timer & Notification banner -->
-        <div class="flex flex-col items-center">
-          <!-- Lap Live Timer -->
-          <div class="text-center px-4 py-1.5 bg-slate-950/80 backdrop-blur-md border border-slate-800/80 rounded-full">
-            <span id="hud-timer" class="font-orbitron font-semibold text-lg text-slate-100 tracking-wider">00:00.00</span>
-          </div>
-          
-          <!-- Mid-screen flash banner -->
-          <div id="flash-banner" class="mt-4 transform -translate-y-2 flex items-center justify-center pointer-events-none transition-all duration-300 scale-95 opacity-0">
-            <div class="bg-[#dda15e] text-slate-950 text-xs font-extrabold uppercase font-orbitron tracking-widest px-4 py-1.5 rounded border border-amber-300 shadow-[0_0_15px_rgba(218,161,94,0.5)]">
+        <!-- Center Stage relative floating anchor (for non-disruptive Flash Banner notification overlay) -->
+        <div class="absolute left-1/2 top-4 transform -translate-x-1/2 z-40 pointer-events-none">
+          <div id="flash-banner" class="flex items-center justify-center transition-all duration-300 scale-75 sm:scale-100 opacity-0">
+            <div class="bg-[#dda15e] text-slate-950 text-[10px] sm:text-xs font-extrabold uppercase font-orbitron tracking-widest px-3 sm:px-4 py-1.5 rounded-lg border border-amber-300 shadow-[0_0_15px_rgba(218,161,94,0.6)]">
               LAP COMPLETE!
             </div>
           </div>
         </div>
 
-        <!-- Lap History Panel -->
-        <div class="flex flex-col bg-slate-950/70 backdrop-blur-md border border-slate-800/80 p-3 rounded-xl pointer-events-auto min-w-[160px] text-right">
-          <span class="text-[10px] text-slate-400 font-orbitron tracking-widest uppercase">BEST LAP</span>
-          <div id="hud-best-lap" class="text-lg font-black font-orbitron text-emerald-400 mt-1">--:--.--</div>
-          <span class="block text-[10px] text-slate-500 mt-1 uppercase">Prev Lap: <span id="hud-prev-lap" class="font-mono text-slate-300">--:--</span></span>
+        <!-- Right Panel: Historical Bests & Records -->
+        <div class="flex flex-col bg-slate-950/75 backdrop-blur-md border border-slate-800/80 p-2.5 sm:p-3 rounded-xl pointer-events-auto min-w-[125px] sm:min-w-[150px] text-right shadow-lg">
+          <span class="text-[9px] sm:text-[10px] text-slate-400 font-orbitron tracking-widest uppercase font-bold">BEST LAP</span>
+          <div id="hud-best-lap" class="text-base sm:text-2xl font-black font-orbitron text-emerald-400 mt-1">--:--.--</div>
+          <span class="block text-[9px] sm:text-[10px] text-slate-500 mt-1 uppercase">Prev: <span id="hud-prev-lap" class="font-mono text-slate-300 font-semibold text-[10px] sm:text-xs">--:--</span></span>
         </div>
       </div>
 
